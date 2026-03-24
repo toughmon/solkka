@@ -1,4 +1,3 @@
-import React from 'react';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar from '../components/BottomNavBar';
 
@@ -6,11 +5,11 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface pb-32">
       <TopAppBar />
-      
+
       <main className="pt-24 px-5 max-w-2xl mx-auto space-y-8">
         {/* Welcome Section */}
         <section className="space-y-2">
-          <h2 className="text-3xl font-headline font-semibold text-primary tracking-tight">잔잔한 속삭임</h2>
+          <h2 className="text-3xl font-headline font-semibold text-primary tracking-tight">Solkka</h2>
           <p className="text-on-surface-variant text-sm max-w-[85%] leading-relaxed">
             생각을 위한 조용한 공간입니다. 익명으로 안전하게 당신의 마음을 나누어보세요.
           </p>
@@ -162,7 +161,7 @@ export default function HomePage() {
           </article>
         </div>
       </main>
-      
+
       <BottomNavBar />
     </div>
   );

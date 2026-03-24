@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function BottomNavBar() {
   return (
     <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-2 bg-[#fbf9f8]/80 dark:bg-[#1a1c1e]/80 backdrop-blur-xl rounded-t-[1.5rem] shadow-[0_-4px_40px_rgba(49,51,50,0.06)]">

@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  --color-on-surface: #313332;
+  --color-background: #fbf9f8;
+  --color-secondary: #6b5b5b;
+  --color-on-error-container: #6e0a12;
+  --color-secondary-dim: #5e5050;
+  --color-tertiary: #4f645b;
+  --color-secondary-fixed: #f3dedd;
+  --color-primary-container: #cbe3f7;
+  --color-surface-container-high: #e9e8e7;
+  --color-inverse-primary: #cbe3f7;
+  --color-on-secondary-container: #5d4e4e;
+  --color-error-container: #fa746f;
+  --color-error: #a83836;
+  --color-surface-variant: #e2e2e1;
+  --color-tertiary-fixed: #e7fff3;
+  --color-surface-tint: #4c6272;
+  --color-outline-variant: #b1b2b1;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface: #fbf9f8;
+  --color-on-secondary-fixed: #4a3c3c;
+  --color-on-tertiary-container: #4f635b;
+  --color-secondary-container: #f3dedd;
+  --color-inverse-on-surface: #9d9d9c;
+  --color-primary: #4c6272;
+  --color-on-primary: #f5f9ff;
+  --color-outline: #7a7b7a;
+  --color-inverse-surface: #0d0e0e;
+  --color-surface-bright: #fbf9f8;
+  --color-surface-container-highest: #e2e2e1;
+  --color-surface-container-low: #f5f3f2;
+  --color-on-tertiary: #e7fef3;
+  --color-error-dim: #67040d;
+  --color-on-background: #313332;
+  --color-on-tertiary-fixed-variant: #596e65;
+  --color-on-primary-fixed-variant: #465c6d;
+  --color-on-primary-container: #3d5363;
+  --color-on-error: #fff7f6;
+  --color-secondary-fixed-dim: #e4d0cf;
+  --color-primary-fixed: #cbe3f7;
+  --color-primary-dim: #405666;
+  --color-tertiary-container: #e7fff3;
+  --color-on-secondary: #fff7f6;
+  --color-primary-fixed-dim: #bdd5e8;
+  --color-on-tertiary-fixed: #3d5149;
+  --color-on-surface-variant: #5e5f5f;
+  --color-on-secondary-fixed-variant: #675858;
+  --color-tertiary-fixed-dim: #d9f0e5;
+  --color-on-primary-fixed: #2a4050;
+  --color-surface-container: #efeeec;
+  --color-tertiary-dim: #43574f;
+  --color-surface-dim: #dadad9;
+
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Manrope", sans-serif;
+  --font-label: "Manrope", sans-serif;
+}
+
+@layer base {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    min-height: max(884px, 100dvh);
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+    font-family: var(--font-body);
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}

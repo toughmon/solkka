@@ -26,6 +26,7 @@ interface Comment {
   created_at: string;
   like_count: number;
   is_liked: boolean;
+  is_deleted: boolean;
 }
 
 export default function PostDetailPage() {
@@ -35,7 +36,7 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
-  const [replyTo, setReplyTo] = useState<Comment | null>(null); // 답글 대상 저장
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -146,6 +147,35 @@ export default function PostDetailPage() {
     }
   };
 
+  const handleDeleteComment = async (commentId: number) => {
+    if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
+
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+
+    if (!user) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_account_id: user.id })
+      });
+
+      if (res.ok) {
+        fetchComments();
+      } else {
+        const data = await res.json();
+        alert(data.message || '삭제에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('Delete Comment Error:', err);
+    }
+  };
+
   const handleSendComment = async () => {
     if (!newComment.trim()) return;
 
@@ -166,7 +196,7 @@ export default function PostDetailPage() {
       if (res.ok) {
         setNewComment('');
         setReplyTo(null);
-        fetchComments(); // 댓글 목록 새로고침
+        fetchComments();
       } else {
         alert('댓글 등록에 실패했습니다.');
       }
@@ -189,8 +219,6 @@ export default function PostDetailPage() {
     return `${diffInDays}일 전`;
   };
 
-  // Organize comments into recursively rendered tree structure
-  
   const renderComment = (comment: Comment, depth = 0) => (
     <div 
       key={comment.id} 
@@ -202,38 +230,51 @@ export default function PostDetailPage() {
       style={{ marginLeft: depth > 0 ? `${Math.min(depth * 1.5, 4)}rem` : '0' }}
     >
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden opacity-80">
           <img 
             alt="Contributor Avatar" 
-            className="w-full h-full object-cover" 
-            src={comment.author_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_nickname}`}
+            className={`w-full h-full object-cover ${comment.is_deleted ? 'grayscale brightness-150' : ''}`} 
+            src={comment.is_deleted ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ccc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>' : (comment.author_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_nickname}`)}
           />
         </div>
-        <span className="font-bold text-sm text-on-surface">{comment.author_nickname || '익명의 리스너'}</span>
+        {!comment.is_deleted && (
+          <span className="font-bold text-sm text-on-surface">{comment.author_nickname || '익명의 리스너'}</span>
+        )}
         <span className="text-[10px] text-on-surface-variant font-label ml-auto">{getTimeAgo(comment.created_at)}</span>
       </div>
-      <p className="text-sm text-on-surface-variant leading-relaxed">
-        {comment.content}
+      <p className={`text-sm leading-relaxed ${comment.is_deleted ? 'text-outline-variant italic' : 'text-on-surface-variant'}`}>
+        {comment.is_deleted ? '삭제된 댓글입니다.' : comment.content}
       </p>
-      <div className="flex items-center gap-4 pt-1">
-        <button 
-          onClick={() => handleLikeComment(comment.id)}
-          className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
-        >
-          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-          <span className="text-[10px] font-bold">{comment.like_count}</span>
-        </button>
-        <button 
-          onClick={() => {
-            setReplyTo(comment);
-            // Optional: Scroll to input field
-          }}
-          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-        >
-          <span className="material-symbols-outlined text-xs">reply</span>
-          답글 달기
-        </button>
-      </div>
+      {!comment.is_deleted && (
+        <div className="flex items-center gap-4 pt-1">
+          <button 
+            onClick={() => handleLikeComment(comment.id)}
+            className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
+          >
+            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+            <span className="text-[10px] font-bold">{comment.like_count}</span>
+          </button>
+          <button 
+            onClick={() => setReplyTo(comment)}
+            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-xs">reply</span>
+            답글 달기
+          </button>
+          {(() => {
+            const userData = localStorage.getItem('user');
+            const user = userData ? JSON.parse(userData) : null;
+            return user && comment.author_nickname === user.nickname && (
+              <button 
+                onClick={() => handleDeleteComment(comment.id)}
+                className="text-[10px] font-bold text-error/60 hover:text-error hover:underline ml-auto"
+              >
+                삭제
+              </button>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 
@@ -260,13 +301,9 @@ export default function PostDetailPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen pb-40">
-      {/* TopAppBar Shell */}
       <header className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#fbf9f8]/80 backdrop-blur-xl z-50 border-b border-gray-100">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#efeeec] transition-colors duration-300"
-          >
+          <button onClick={() => navigate(-1)} className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[#efeeec] transition-colors duration-300">
             <span className="material-symbols-outlined text-[#4c6272]">arrow_back</span>
           </button>
           <h1 className="text-lg font-bold tracking-tight text-[#4c6272]">Haven Echo</h1>
@@ -277,24 +314,17 @@ export default function PostDetailPage() {
       </header>
 
       <main className="pt-24 px-6 max-w-2xl mx-auto space-y-8">
-        {/* Post Content */}
         <article className="space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-secondary-container flex-shrink-0">
-              <img 
-                alt="Anonymous Avatar" 
-                className="w-full h-full object-cover" 
-                src={post.author_avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'}
-              />
+              <img alt="Avatar" className="w-full h-full object-cover" src={post.author_avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'} />
             </div>
             <div className="flex flex-col">
               <span className="font-headline font-bold text-primary tracking-tight">{post.author_nickname || '익명의 여행자'}</span>
               <span className="text-xs text-on-surface-variant font-label">{getTimeAgo(post.created_at)}</span>
             </div>
             <div className="ml-auto">
-              <span className="px-3 py-1 bg-tertiary-container text-on-tertiary-container text-[10px] font-bold uppercase tracking-wider rounded-full">
-                {post.category_name}
-              </span>
+              <span className="px-3 py-1 bg-tertiary-container text-on-tertiary-container text-[10px] font-bold uppercase tracking-wider rounded-full">{post.category_name}</span>
             </div>
           </div>
           <div className="space-y-2">
@@ -303,14 +333,7 @@ export default function PostDetailPage() {
           </div>
           <div className="space-y-4 text-on-surface-variant leading-relaxed text-lg whitespace-pre-wrap">{post.content}</div>
           <div className="flex items-center gap-6 pt-4">
-            <button 
-              onClick={handleLikePost}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all ${
-                post.is_liked 
-                  ? 'bg-error-container border-error text-on-error-container' 
-                  : 'bg-surface-container-low border-outline-variant/10 text-on-surface'
-              }`}
-            >
+            <button onClick={handleLikePost} className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all ${post.is_liked ? 'bg-error-container border-error text-on-error-container' : 'bg-surface-container-low border-outline-variant/10 text-on-surface'}`}>
               <span className="material-symbols-outlined" style={{ fontVariationSettings: post.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
               <span className="font-bold text-sm tracking-tight">{post.like_count}</span>
             </button>
@@ -323,57 +346,28 @@ export default function PostDetailPage() {
 
         <div className="h-4 border-b border-gray-100"></div>
 
-        {/* Comments Section */}
         <section className="space-y-6 pb-20">
-          <h3 className="font-headline font-bold text-xl text-primary flex items-center gap-2">
-            Echoes of Support
-            <span className="w-2 h-2 rounded-full bg-secondary"></span>
-          </h3>
+          <h3 className="font-headline font-bold text-xl text-primary flex items-center gap-2">Echoes of Support <span className="w-2 h-2 rounded-full bg-secondary"></span></h3>
           <div className="space-y-6">
-            {comments.length > 0 ? (
-              renderCommentTree(null)
-            ) : (
-              <div className="text-center py-10 text-on-surface-variant/60 italic">
-                아직 도착한 위로가 없습니다. 첫마디를 건네보세요.
-              </div>
-            )}
+            {comments.length > 0 ? renderCommentTree(null) : <div className="text-center py-10 text-on-surface-variant/60 italic">아직 도착한 위로가 없습니다. 첫마디를 건네보세요.</div>}
           </div>
         </section>
 
-        {/* Input Bar (Floating) */}
         <div className="fixed bottom-24 left-6 right-6 z-40 max-w-2xl mx-auto">
           {replyTo && (
             <div className="bg-primary/5 border-l-4 border-primary px-4 py-2 mb-2 rounded-r-lg flex justify-between items-center animate-fade-in backdrop-blur-sm">
-              <p className="text-xs text-primary font-bold">
-                <span className="font-normal opacity-70">Replying to:</span> {replyTo.author_nickname || '익명'} 💬
-              </p>
-              <button 
-                onClick={() => setReplyTo(null)}
-                className="text-xs text-outline-variant hover:text-error"
-              >
-                Cancel
-              </button>
+              <p className="text-xs text-primary font-bold"><span className="font-normal opacity-70">Replying to:</span> {replyTo.author_nickname || '익명'} 💬</p>
+              <button onClick={() => setReplyTo(null)} className="text-xs text-outline-variant hover:text-error">Cancel</button>
             </div>
           )}
           <div className="bg-white/80 backdrop-blur-md rounded-2xl p-2 flex items-center gap-3 shadow-xl border border-white/40">
-            <input 
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-              className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-3 text-on-surface font-body" 
-              placeholder={replyTo ? `${replyTo.author_nickname}님에게 답글 남기기...` : "따뜻한 한마디를 남겨주세요..."}
-              type="text"
-            />
-            <button 
-              onClick={handleSendComment}
-              className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dim rounded-xl flex items-center justify-center text-white shadow-md active:scale-95 transition-all"
-            >
+            <input value={newComment} onChange={(e) => setNewComment(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendComment()} className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-3 text-on-surface font-body" placeholder={replyTo ? `${replyTo.author_nickname}님에게 답글 남기기...` : "따뜻한 한마디를 남겨주세요..."} type="text" />
+            <button onClick={handleSendComment} className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dim rounded-xl flex items-center justify-center text-white shadow-md active:scale-95 transition-all">
               <span className="material-symbols-outlined text-[20px]">send</span>
             </button>
           </div>
         </div>
       </main>
-
       <BottomNavBar />
     </div>
   );

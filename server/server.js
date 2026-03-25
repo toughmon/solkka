@@ -478,6 +478,32 @@ app.post('/api/comments/:id/like', async (req, res) => {
   }
 });
 
+// 10. 댓글 삭제 (소프트 딜리트)
+app.delete('/api/comments/:id', async (req, res) => {
+  const { id } = req.params;
+  const { user_account_id } = req.body;
+
+  if (!user_account_id) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE solkka.comment SET is_deleted = TRUE WHERE id = $1 AND user_account_id = $2 RETURNING id',
+      [id, user_account_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({ message: '본인의 댓글만 삭제할 수 있습니다.' });
+    }
+
+    res.json({ success: true, message: '댓글이 삭제되었습니다.' });
+  } catch (error) {
+    console.error('Delete Comment Error:', error);
+    res.status(500).json({ message: '댓글 삭제 중 오류가 발생했습니다.' });
+  }
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

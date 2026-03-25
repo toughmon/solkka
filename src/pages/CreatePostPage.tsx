@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNavBar from '../components/BottomNavBar';
 import AlertModal from '../components/AlertModal';
+import { authFetch } from '../utils/api';
 
 interface Category {
   id: number;
@@ -21,7 +22,7 @@ export default function CreatePostPage() {
 
   // 1. 카테고리 목록 불러오기
   useEffect(() => {
-    fetch('/api/categories')
+    authFetch('/api/categories')
       .then(res => res.json())
       .then(data => {
         setCategories(data);
@@ -36,22 +37,11 @@ export default function CreatePostPage() {
       return;
     }
 
-    const userData = localStorage.getItem('user');
-    const user = userData ? JSON.parse(userData) : null;
-
-    if (!user || !user.id) {
-      alert('로그인 정보가 유효하지 않습니다. 다시 로그인해 주세요.');
-      navigate('/login');
-      return;
-    }
-
     setLoading(true);
     try {
-      const res = await fetch('/api/posts', {
+      const res = await authFetch('/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_account_id: user?.id,
           category_id: selectedCategoryId,
           title,
           content,
@@ -83,7 +73,7 @@ export default function CreatePostPage() {
           <span className="material-symbols-outlined">close</span>
         </button>
         <h1 className="font-headline text-xl font-semibold tracking-tight text-[#4c6272]">마음 나누기</h1>
-        <button 
+        <button
           onClick={handleSubmit}
           disabled={loading}
           className="px-5 py-2 rounded-full font-headline font-bold text-sm tracking-wide bg-gradient-to-br from-primary to-primary-dim text-on-primary hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
@@ -104,11 +94,10 @@ export default function CreatePostPage() {
                     key={cat.id}
                     type="button"
                     onClick={() => setSelectedCategoryId(cat.id)}
-                    className={`px-4 py-2 rounded-full font-medium text-sm transition-all border ${
-                      selectedCategoryId === cat.id 
-                        ? 'bg-primary text-white border-transparent shadow-sm' 
-                        : 'bg-white text-on-surface-variant border-gray-200 hover:bg-gray-50'
-                    }`}
+                    className={`px-4 py-2 rounded-full font-medium text-sm transition-all border ${selectedCategoryId === cat.id
+                      ? 'bg-primary text-white border-transparent shadow-sm'
+                      : 'bg-white text-on-surface-variant border-gray-200 hover:bg-gray-50'
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -150,11 +139,11 @@ export default function CreatePostPage() {
                   1:1 상담 요청하기
                 </h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  누군가의 따뜻한 조언이나 위로가 필요한가요? <br/>
+                  누군가의 따뜻한 조언이나 위로가 필요한가요? <br />
                   체크하면 상담사나 숙련된 유저가 말을 걸어올 수 있습니다.
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setIsCounselingRequested(!isCounselingRequested)}
                 className={`w-12 h-6 flex-shrink-0 rounded-full transition-all relative block ${isCounselingRequested ? 'bg-primary' : 'bg-gray-300'}`}
               >
@@ -165,7 +154,7 @@ export default function CreatePostPage() {
         </div>
       </main>
 
-      <AlertModal 
+      <AlertModal
         isOpen={showSuccessModal}
         title="게시 완료"
         message="당신의 소중한 마음이 잘 전달되었습니다."

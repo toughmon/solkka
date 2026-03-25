@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar from '../components/BottomNavBar';
+import { authFetch } from '../utils/api';
 
 interface Post {
   id: number;
@@ -30,7 +31,7 @@ export default function HomePage() {
       const user = userData ? JSON.parse(userData) : null;
       const userIdParam = user ? `?user_id=${user.id}` : '';
 
-      const res = await fetch(`/api/posts${userIdParam}`);
+      const res = await authFetch(`/api/posts${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setPosts(data);
@@ -46,19 +47,18 @@ export default function HomePage() {
     e.stopPropagation(); // Prevent navigating to detail page
 
     const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
     const user = userData ? JSON.parse(userData) : null;
 
-    if (!user) {
+    if (!user || !token) {
       alert('좋아요를 누르려면 로그인이 필요합니다.');
       navigate('/login');
       return;
     }
 
     try {
-      const res = await fetch(`/api/posts/${postId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_account_id: user.id })
+      const res = await authFetch(`/api/posts/${postId}/like`, {
+        method: 'POST'
       });
 
       if (res.ok) {
@@ -145,11 +145,11 @@ export default function HomePage() {
             <>
               {(() => {
                 const supportIndex = Math.floor(Math.random() * (posts.length)) || (posts.length > 0 ? 0 : -1);
-                
+
                 return posts.map((post, index) => {
                   const postElement = (
-                    <article 
-                      key={post.id} 
+                    <article
+                      key={post.id}
                       onClick={() => navigate(`/post/${post.id}`)}
                       className="bg-surface-container-lowest p-6 rounded-xl space-y-4 transition-all hover:translate-y-[-2px] hover:shadow-md border border-outline-variant/5 cursor-pointer"
                     >
@@ -172,7 +172,7 @@ export default function HomePage() {
                       </div>
                       <div className="flex items-center justify-between pt-2">
                         <div className="flex items-center gap-6">
-                          <button 
+                          <button
                             onClick={(e) => handleLikePost(e, post.id)}
                             className={`flex items-center gap-1.5 transition-colors group ${post.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
                           >
@@ -205,7 +205,7 @@ export default function HomePage() {
             <div className="text-center py-20 bg-surface-container-lowest rounded-xl">
               <span className="material-symbols-outlined text-5xl text-outline-variant mb-4">draw</span>
               <p className="text-on-surface-variant font-medium">아직 게시글이 없습니다. 첫 번째 이야기를 들려주세요.</p>
-              <button 
+              <button
                 onClick={() => navigate('/create')}
                 className="mt-6 px-6 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-md"
               >
@@ -218,14 +218,14 @@ export default function HomePage() {
 
       <BottomNavBar />
 
-      <button 
+      <button
         onClick={() => navigate('/create')}
         className="fixed bottom-28 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 md:hidden"
       >
         <span className="material-symbols-outlined text-3xl">add</span>
       </button>
 
-      <button 
+      <button
         onClick={() => navigate('/create')}
         className="fixed bottom-10 right-10 hidden md:flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full shadow-xl hover:bg-primary-dim transition-all z-40 group"
       >

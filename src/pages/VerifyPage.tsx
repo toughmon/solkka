@@ -9,7 +9,7 @@ export default function VerifyPage() {
   const [errorMSG, setErrorMSG] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [generatedNickname, setGeneratedNickname] = useState('');
-  
+
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -41,8 +41,12 @@ export default function VerifyPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // 백엔드에서 생성해준 8자리 난수 닉네임을 상태에 저장하고 모달 띄우기
-        setGeneratedNickname(data.nickname);
+        // 백엔드에서 생성해준 정보를 저장하고 모달 띄우기
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.removeItem('token');
+        setGeneratedNickname(data.user.nickname);
         setShowModal(true);
       } else {
         setErrorMSG(data.message || '인증에 실패했습니다.');
@@ -59,28 +63,28 @@ export default function VerifyPage() {
     setLoading(true);
     setErrorMSG('');
     try {
-       const res = await fetch('/api/auth/send-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-       });
-       const data = await res.json();
-       if(res.ok) {
-          alert('가입하신 이메일로 코드를 새롭게 재전송했습니다.');
-       } else {
-          setErrorMSG(data.message || '재전송 실패');
-       }
-    } catch(err) {
-       setErrorMSG('재전송에 실패했습니다.');
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert('가입하신 이메일로 코드를 새롭게 재전송했습니다.');
+      } else {
+        setErrorMSG(data.message || '재전송 실패');
+      }
+    } catch (err) {
+      setErrorMSG('재전송에 실패했습니다.');
     } finally {
-       setLoading(false);
+      setLoading(false);
     }
   };
 
   const processInput = (e: React.ChangeEvent<HTMLInputElement>, slot: number) => {
     const value = e.target.value;
     if (/[^0-9a-zA-Z]/.test(value)) return; // Allow numbers and letters for verification code if needed, or strictly numbers
-    
+
     const newCode = [...code];
     newCode[slot] = value;
     setCode(newCode);
@@ -122,17 +126,17 @@ export default function VerifyPage() {
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col relative overflow-hidden">
       {/* Background Decorative Image - safely pushed back */}
       <div className="fixed inset-0 -z-50 opacity-[0.03] pointer-events-none bg-surface">
-        <img 
-          className="w-full h-full object-cover" 
-          alt="texture" 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7HrXRQrZP83OjXdQKMKM7knxmjwYDkXjbP0DvBc8uqwI5MnWQ4Tr4XjLMbZzlPxUCcfc_KIeD6pKQCaOG_l_F70YzCsn3P3DlKH5293wq1-SxTveqapOFN80V9ta4DPnd5C0r5-EJsUd_Og9BQdlBgqBSzD0UrlDkBscJwKzVtlu6bmvnUtGCgLkcrcejJJme9XzSZOObDFHEU916TaRHoV8fmq6S9gW-EnjP8AwH8pGCj6t1SQRsd3t68Oq34jNck2N_rs1CSCA" 
+        <img
+          className="w-full h-full object-cover"
+          alt="texture"
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7HrXRQrZP83OjXdQKMKM7knxmjwYDkXjbP0DvBc8uqwI5MnWQ4Tr4XjLMbZzlPxUCcfc_KIeD6pKQCaOG_l_F70YzCsn3P3DlKH5293wq1-SxTveqapOFN80V9ta4DPnd5C0r5-EJsUd_Og9BQdlBgqBSzD0UrlDkBscJwKzVtlu6bmvnUtGCgLkcrcejJJme9XzSZOObDFHEU916TaRHoV8fmq6S9gW-EnjP8AwH8pGCj6t1SQRsd3t68Oq34jNck2N_rs1CSCA"
         />
       </div>
 
       {/* Header (TopAppBar) */}
       <header className="bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-surface-container-low fixed top-0 w-full z-50">
         <div className="flex items-center justify-between px-6 py-4 w-full">
-          <button 
+          <button
             onClick={() => window.history.back()}
             className="flex items-center justify-center p-2 rounded-full hover:bg-surface-container transition-all duration-300 active:scale-95 text-primary"
           >
@@ -145,7 +149,7 @@ export default function VerifyPage() {
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col items-center justify-center px-6 pt-32 pb-12 max-w-md mx-auto w-full relative z-10">
-        
+
         {/* Supportive Backdrop Texture (Asymmetric) */}
         <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-tertiary-container/30 rounded-full blur-[80px] -z-20 pointer-events-none"></div>
         <div className="fixed -top-20 -right-20 w-80 h-80 bg-secondary-container/30 rounded-full blur-[100px] -z-20 pointer-events-none"></div>
@@ -170,16 +174,16 @@ export default function VerifyPage() {
         <div className="w-full space-y-8 bg-white p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
           <div className="flex justify-between gap-2 md:gap-4" onPaste={handlePaste}>
             {code.map((num, idx) => (
-              <input 
+              <input
                 key={idx}
                 ref={(el) => { inputs.current[idx] = el; }}
                 value={num}
                 onChange={(e) => processInput(e, idx)}
                 onKeyDown={(e) => handleKeyDown(e, idx)}
-                className="w-full h-14 md:h-16 text-center text-2xl font-bold rounded-xl border border-gray-200 bg-gray-50 focus:bg-white transition-colors duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-900 outline-none" 
-                maxLength={1} 
-                placeholder="·" 
-                type="text" 
+                className="w-full h-14 md:h-16 text-center text-2xl font-bold rounded-xl border border-gray-200 bg-gray-50 focus:bg-white transition-colors duration-300 focus:ring-2 focus:ring-primary/20 focus:border-primary text-gray-900 outline-none"
+                maxLength={1}
+                placeholder="·"
+                type="text"
               />
             ))}
           </div>
@@ -191,7 +195,7 @@ export default function VerifyPage() {
             </div>
           )}
 
-          <button 
+          <button
             onClick={handleVerify}
             disabled={loading}
             className="bg-primary hover:bg-[#3d4f5c] disabled:opacity-50 disabled:cursor-not-allowed w-full py-4 rounded-xl text-white font-headline font-bold text-lg shadow-md active:scale-[0.98] transition-all duration-300"
@@ -201,7 +205,7 @@ export default function VerifyPage() {
 
           <div className="text-center pt-2">
             <p className="text-sm text-gray-500">
-              코드를 받지 못하셨나요? 
+              코드를 받지 못하셨나요?
               <button onClick={handleResend} disabled={loading} className="text-primary font-bold hover:underline underline-offset-4 ml-1 disabled:opacity-50">코드 재전송</button>
             </p>
           </div>
@@ -220,11 +224,11 @@ export default function VerifyPage() {
       )}
 
       {/* 회원가입 성공 모달 */}
-      <AlertModal 
+      <AlertModal
         isOpen={showModal}
         title="Welcome to Solkka"
         message={`회원가입이 완료되었습니다.\n익명 닉네임: ${generatedNickname}`}
-        onConfirm={() => navigate('/login', { replace: true })}
+        onConfirm={() => navigate('/', { replace: true })}
       />
     </div>
   );

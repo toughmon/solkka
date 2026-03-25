@@ -92,5 +92,14 @@ CREATE TABLE IF NOT EXISTS comment_like (
   user_account_id INT REFERENCES user_account(id) ON DELETE CASCADE,
   comment_id INT REFERENCES comment(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_account_id, comment_id)
+  -- 8. 리프레시 토큰(refresh_token) 테이블
+CREATE TABLE IF NOT EXISTS refresh_token (
+  id SERIAL PRIMARY KEY,
+  user_account_id INT REFERENCES user_account(id) ON DELETE CASCADE,
+  token TEXT UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_refresh_token_user ON refresh_token(user_account_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_lookup ON refresh_token(token);

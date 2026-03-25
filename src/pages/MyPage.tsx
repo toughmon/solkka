@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNavBar from '../components/BottomNavBar';
+import { authFetch } from '../utils/api';
 
 export default function MyPage() {
   const navigate = useNavigate();
@@ -13,8 +14,23 @@ export default function MyPage() {
     }
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      try {
+        await authFetch('/api/auth/logout', {
+          method: 'POST',
+          body: JSON.stringify({ refreshToken })
+        });
+      } catch (err) {
+        console.error('Logout API Error:', err);
+      }
+    }
+
     localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('token');
     alert('로그아웃 되었습니다.');
     navigate('/login');
   };
@@ -27,11 +43,8 @@ export default function MyPage() {
     const newAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}`;
 
     try {
-      const res = await fetch(`/api/users/${user.id}/avatar`, {
+      const res = await authFetch(`/api/users/${user.id}/avatar`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ avatar_url: newAvatarUrl })
       });
 
@@ -53,7 +66,7 @@ export default function MyPage() {
       <header className="bg-[#fbf9f8]/80 dark:bg-[#1a1c1e]/80 backdrop-blur-xl fixed top-0 w-full z-50">
         <div className="flex items-center justify-between px-6 h-16 w-full">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => navigate(-1)}
               className="text-[#4c6272] dark:text-[#a5c8df] hover:opacity-80 transition-opacity"
             >
@@ -62,7 +75,7 @@ export default function MyPage() {
             <h1 className="font-headline font-semibold text-lg tracking-tight text-[#4c6272] dark:text-[#a5c8df]">마이페이지</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={handleLogout}
               className="text-red-500 font-medium text-sm hover:opacity-80 transition-opacity"
             >
@@ -81,13 +94,13 @@ export default function MyPage() {
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="relative group">
               <div className="w-24 h-24 rounded-full bg-white/40 backdrop-blur-md p-1 mb-4 shadow-sm overflow-hidden">
-                <img 
-                  alt="Avatar" 
-                  className="w-full h-full rounded-full bg-surface-container-lowest object-cover" 
-                  src={user?.avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'} 
+                <img
+                  alt="Avatar"
+                  className="w-full h-full rounded-full bg-surface-container-lowest object-cover"
+                  src={user?.avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'}
                 />
               </div>
-              <button 
+              <button
                 onClick={handleRefreshAvatar}
                 className="absolute bottom-4 right-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-20 border-2 border-white"
                 title="아바타 새로고침"

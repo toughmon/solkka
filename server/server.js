@@ -3,8 +3,12 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+const JWT_SECRET = process.env.JWT_SECRET || 'solkka-secret-key-2024';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'solkka-refresh-secret-2024';
 
 const app = express();
 
@@ -17,6 +21,20 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.url}`);
   next();
 });
+
+// JWT 인증 미들웨어
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ message: '인증 토큰이 필요합니다.' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: '만료되거나 유효하지 않은 토큰입니다.' });
+    req.user = user;
+    next();
+  });
+};
 
 // 1. PostgreSQL DB 연결 풀
 const pool = new Pool({
@@ -67,7 +85,7 @@ app.post('/api/auth/send-code', async (req, res) => {
   try {
     // 1. 동일 이메일의 기존 인증 코드가 있다면 덮어쓰기 위해 삭제
     await pool.query('DELETE FROM solkka.email_verification WHERE email = $1', [email]);
-    
+
     // 2. 새 인증 번호를 DB에 저장
     await pool.query(
       'INSERT INTO solkka.email_verification (email, code, expires_at) VALUES ($1, $2, $3)',
@@ -133,9 +151,9 @@ app.post('/api/auth/verify', async (req, res) => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let randomNickname = '';
     for (let i = 0; i < 8; i++) {
-        randomNickname += chars.charAt(Math.floor(Math.random() * chars.length));
+      randomNickname += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    
+
     // (단방향 암호화: bcrypt를 이용한 패스워드 해싱, salt rounds = 10)
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -143,21 +161,43 @@ app.post('/api/auth/verify', async (req, res) => {
     const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomNickname}`;
 
     // 5. user_account 테이블에 영구 저장
-    await pool.query(
-      'INSERT INTO solkka.user_account (email, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4)',
+    const signupResult = await pool.query(
+      'INSERT INTO solkka.user_account (email, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4) RETURNING id',
       [email, passwordHash, randomNickname, avatarUrl]
     );
 
     // 6. 사용된 인증 코드 파기
     await pool.query('DELETE FROM solkka.email_verification WHERE email = $1', [email]);
 
-    res.json({ success: true, message: '회원가입이 성공적으로 완료되었습니다!', nickname: randomNickname });
+    // 7. JWT 토큰 발급 (Access & Refresh)
+    const accessToken = jwt.sign({ id: signupResult.rows[0].id, email }, JWT_SECRET, { expiresIn: '1h' });
+    const refreshToken = jwt.sign({ id: signupResult.rows[0].id, email }, REFRESH_SECRET, { expiresIn: '7d' });
+
+    // 8. Refresh Token DB 저장
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await pool.query(
+      'INSERT INTO solkka.refresh_token (user_account_id, token, expires_at) VALUES ($1, $2, $3)',
+      [signupResult.rows[0].id, refreshToken, expiresAt]
+    );
+
+    res.json({
+      success: true,
+      message: '회원가입이 성공적으로 완료되었습니다!',
+      accessToken,
+      refreshToken,
+      user: {
+        id: signupResult.rows[0].id,
+        email: email,
+        nickname: randomNickname,
+        avatar_url: avatarUrl
+      }
+    });
 
   } catch (error) {
     console.error('Verify & Signup Error:', error);
     // 중복 이메일 체크 (Unique 제약조건 위반 - error.code === '23505')
     if (error.code === '23505') {
-       return res.status(400).json({ success: false, message: '이미 가입된 이메일 계정입니다.' });
+      return res.status(400).json({ success: false, message: '이미 가입된 이메일 계정입니다.' });
     }
     res.status(500).json({ success: false, message: '회원가입 처리 중 오류가 발생했습니다.' });
   }
@@ -188,10 +228,30 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ success: false, message: '가입되지 않은 이메일이거나 비밀번호가 틀렸습니다.' });
     }
 
-    // TODO: JWT 토큰 발급 또는 세션 처리. 임시로 성공 메시지만 넘김
-    res.json({ 
-      success: true, 
-      message: '로그인 성공', 
+    // 4. JWT 토큰 발급 (Access & Refresh)
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+    const refreshToken = jwt.sign(
+      { id: user.id, email: user.email },
+      REFRESH_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 5. Refresh Token DB 저장
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await pool.query(
+      'INSERT INTO solkka.refresh_token (user_account_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, refreshToken, expiresAt]
+    );
+
+    res.json({
+      success: true,
+      message: '로그인 성공',
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -203,6 +263,64 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Login Error:', error);
     res.status(500).json({ success: false, message: '로그인 처리 중 서버 오류가 발생했습니다.' });
+  }
+});
+
+// 4. 토큰 갱신 API (Refresh Token)
+app.post('/api/auth/refresh', async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: '리프레시 토큰이 필요합니다.' });
+  }
+
+  try {
+    // DB에서 토큰 확인
+    const result = await pool.query(
+      'SELECT user_account_id FROM solkka.refresh_token WHERE token = $1 AND expires_at > NOW()',
+      [refreshToken]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({ message: '유효하지 않거나 만료된 세션입니다. 다시 로그인해 주세요.' });
+    }
+
+    const userId = result.rows[0].user_account_id;
+
+    jwt.verify(refreshToken, REFRESH_SECRET, (err, user) => {
+      if (err) {
+        return res.status(403).json({ message: '인증 정보가 비정상적입니다.' });
+      }
+
+      // 새로운 Access Token 발급
+      const accessToken = jwt.sign(
+        { id: userId, email: user.email },
+        JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+
+      res.json({
+        success: true,
+        accessToken
+      });
+    });
+  } catch (err) {
+    console.error('Refresh Error:', err);
+    res.status(500).json({ message: '토큰 갱신 중 오류가 발생했습니다.' });
+  }
+});
+
+// 5. 로그아웃 API (Refresh Token 삭제)
+app.post('/api/auth/logout', async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.json({ success: true });
+
+  try {
+    await pool.query('DELETE FROM solkka.refresh_token WHERE token = $1', [refreshToken]);
+    res.json({ success: true, message: '로그아웃 되었습니다.' });
+  } catch (err) {
+    console.error('Logout Error:', err);
+    res.status(500).json({ message: '로그아웃 처리 중 오류가 발생했습니다.' });
   }
 });
 
@@ -222,8 +340,9 @@ app.get('/api/categories', async (req, res) => {
 });
 
 // 2. 게시글 작성
-app.post('/api/posts', async (req, res) => {
-  const { user_account_id, category_id, title, content, is_counseling_requested } = req.body;
+app.post('/api/posts', authenticateToken, async (req, res) => {
+  const { category_id, title, content, is_counseling_requested } = req.body;
+  const user_account_id = req.user.id;
 
   if (!category_id || !title || !content) {
     return res.status(400).json({ message: '카테고리, 제목, 본문은 필수 입력 사항입니다.' });
@@ -325,9 +444,10 @@ app.get('/api/posts/:id/comments', async (req, res) => {
 });
 
 // 6. 댓글 작성
-app.post('/api/posts/:id/comments', async (req, res) => {
+app.post('/api/posts/:id/comments', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { user_account_id, content, parent_comment_id } = req.body;
+  const { content, parent_comment_id } = req.body;
+  const user_account_id = req.user.id;
 
   if (!content) {
     return res.status(400).json({ message: '댓글 내용을 입력해주세요.' });
@@ -350,9 +470,14 @@ app.post('/api/posts/:id/comments', async (req, res) => {
 });
 
 // 7. 사용자 아바타 랜덤 변경
-app.patch('/api/users/:id/avatar', async (req, res) => {
+app.patch('/api/users/:id/avatar', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { avatar_url } = req.body;
+
+  // 본인 확인
+  if (parseInt(id) !== req.user.id) {
+    return res.status(403).json({ message: '본인의 아바타만 변경할 수 있습니다.' });
+  }
 
   if (!avatar_url) {
     return res.status(400).json({ message: '아바타 URL이 필요합니다.' });
@@ -376,9 +501,9 @@ app.patch('/api/users/:id/avatar', async (req, res) => {
 });
 
 // 8. 게시글 좋아요 토글
-app.post('/api/posts/:id/like', async (req, res) => {
+app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { user_account_id } = req.body;
+  const user_account_id = req.user.id;
 
   if (!user_account_id) {
     return res.status(401).json({ message: '로그인이 필요합니다.' });
@@ -387,7 +512,7 @@ app.post('/api/posts/:id/like', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     // 이미 좋아요를 눌렀는지 확인
     const check = await client.query(
       'SELECT 1 FROM solkka.post_like WHERE user_account_id = $1 AND post_id = $2',
@@ -429,9 +554,9 @@ app.post('/api/posts/:id/like', async (req, res) => {
 });
 
 // 9. 댓글 좋아요 토글
-app.post('/api/comments/:id/like', async (req, res) => {
+app.post('/api/comments/:id/like', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { user_account_id } = req.body;
+  const user_account_id = req.user.id;
 
   if (!user_account_id) {
     return res.status(401).json({ message: '로그인이 필요합니다.' });
@@ -440,7 +565,7 @@ app.post('/api/comments/:id/like', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const check = await client.query(
       'SELECT 1 FROM solkka.comment_like WHERE user_account_id = $1 AND comment_id = $2',
       [user_account_id, id]
@@ -479,9 +604,9 @@ app.post('/api/comments/:id/like', async (req, res) => {
 });
 
 // 10. 댓글 삭제 (소프트 딜리트)
-app.delete('/api/comments/:id', async (req, res) => {
+app.delete('/api/comments/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { user_account_id } = req.body;
+  const user_account_id = req.user.id;
 
   if (!user_account_id) {
     return res.status(401).json({ message: '로그인이 필요합니다.' });

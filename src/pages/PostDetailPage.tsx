@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import BottomNavBar from '../components/BottomNavBar';
+import { authFetch } from '../utils/api';
 
 interface Post {
   id: number;
@@ -51,7 +52,7 @@ export default function PostDetailPage() {
       const user = userData ? JSON.parse(userData) : null;
       const userIdParam = user ? `?user_id=${user.id}` : '';
 
-      const res = await fetch(`/api/posts/${id}${userIdParam}`);
+      const res = await authFetch(`/api/posts/${id}${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setPost(data);
@@ -70,7 +71,7 @@ export default function PostDetailPage() {
       const user = userData ? JSON.parse(userData) : null;
       const userIdParam = user ? `?user_id=${user.id}` : '';
 
-      const res = await fetch(`/api/posts/${id}/comments${userIdParam}`);
+      const res = await authFetch(`/api/posts/${id}/comments${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setComments(data);
@@ -84,19 +85,18 @@ export default function PostDetailPage() {
 
   const handleLikePost = async () => {
     const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
     const user = userData ? JSON.parse(userData) : null;
 
-    if (!user) {
+    if (!user || !token) {
       alert('좋아요를 누르려면 로그인이 필요합니다.');
       navigate('/login');
       return;
     }
 
     try {
-      const res = await fetch(`/api/posts/${id}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_account_id: user.id })
+      const res = await authFetch(`/api/posts/${id}/like`, {
+        method: 'POST'
       });
 
       if (res.ok) {
@@ -114,19 +114,18 @@ export default function PostDetailPage() {
 
   const handleLikeComment = async (commentId: number) => {
     const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
     const user = userData ? JSON.parse(userData) : null;
 
-    if (!user) {
+    if (!user || !token) {
       alert('좋아요를 누르려면 로그인이 필요합니다.');
       navigate('/login');
       return;
     }
 
     try {
-      const res = await fetch(`/api/comments/${commentId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_account_id: user.id })
+      const res = await authFetch(`/api/comments/${commentId}/like`, {
+        method: 'POST'
       });
 
       if (res.ok) {
@@ -151,18 +150,17 @@ export default function PostDetailPage() {
     if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
 
     const userData = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
     const user = userData ? JSON.parse(userData) : null;
 
-    if (!user) {
+    if (!user || !token) {
       alert('로그인이 필요합니다.');
       return;
     }
 
     try {
-      const res = await fetch(`/api/comments/${commentId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_account_id: user.id })
+      const res = await authFetch(`/api/comments/${commentId}`, {
+        method: 'DELETE'
       });
 
       if (res.ok) {
@@ -179,15 +177,17 @@ export default function PostDetailPage() {
   const handleSendComment = async () => {
     if (!newComment.trim()) return;
 
-    const userData = localStorage.getItem('user');
-    const user = userData ? JSON.parse(userData) : null;
+
+    if (!localStorage.getItem('accessToken')) {
+      alert('댓글을 남기려면 로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
 
     try {
-      const res = await fetch(`/api/posts/${id}/comments`, {
+      const res = await authFetch(`/api/posts/${id}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_account_id: user?.id,
           content: newComment,
           parent_comment_id: replyTo ? replyTo.id : null
         })
@@ -220,20 +220,19 @@ export default function PostDetailPage() {
   };
 
   const renderComment = (comment: Comment, depth = 0) => (
-    <div 
-      key={comment.id} 
-      className={`p-6 rounded-xl shadow-sm space-y-3 transition-all hover:translate-y-[-1px] ${
-        depth > 0 
-          ? `bg-surface-container-low border-l-4 border-secondary-fixed-dim` 
-          : 'bg-white border border-gray-100'
-      }`}
+    <div
+      key={comment.id}
+      className={`p-6 rounded-xl shadow-sm space-y-3 transition-all hover:translate-y-[-1px] ${depth > 0
+        ? `bg-surface-container-low border-l-4 border-secondary-fixed-dim`
+        : 'bg-white border border-gray-100'
+        }`}
       style={{ marginLeft: depth > 0 ? `${Math.min(depth * 1.5, 4)}rem` : '0' }}
     >
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden opacity-80">
-          <img 
-            alt="Contributor Avatar" 
-            className={`w-full h-full object-cover ${comment.is_deleted ? 'grayscale brightness-150' : ''}`} 
+          <img
+            alt="Contributor Avatar"
+            className={`w-full h-full object-cover ${comment.is_deleted ? 'grayscale brightness-150' : ''}`}
             src={comment.is_deleted ? 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ccc"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>' : (comment.author_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_nickname}`)}
           />
         </div>
@@ -247,14 +246,14 @@ export default function PostDetailPage() {
       </p>
       {!comment.is_deleted && (
         <div className="flex items-center gap-4 pt-1">
-          <button 
+          <button
             onClick={() => handleLikeComment(comment.id)}
             className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
           >
             <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
             <span className="text-[10px] font-bold">{comment.like_count}</span>
           </button>
-          <button 
+          <button
             onClick={() => setReplyTo(comment)}
             className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
           >
@@ -265,7 +264,7 @@ export default function PostDetailPage() {
             const userData = localStorage.getItem('user');
             const user = userData ? JSON.parse(userData) : null;
             return user && comment.author_nickname === user.nickname && (
-              <button 
+              <button
                 onClick={() => handleDeleteComment(comment.id)}
                 className="text-[10px] font-bold text-error/60 hover:text-error hover:underline ml-auto"
               >

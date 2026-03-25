@@ -25,11 +25,14 @@ export default function LoginPage() {
 
       if (res.ok) {
         localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.removeItem('token'); // Clean up old token if exists
         setShowModal(true);
       } else {
         setErrorMSG(data.message || '로그인에 실패했습니다.');
       }
-    } catch(err) {
+    } catch (err) {
       setErrorMSG('서버와 연결을 실패했습니다.');
     } finally {
       setLoading(false);
@@ -50,7 +53,7 @@ export default function LoginPage() {
       {/* Login Card - using clear borders and clean background */}
       <div className="w-full max-w-md bg-white rounded-[2rem] p-8 md:p-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 relative z-10">
         <form className="space-y-6" onSubmit={handleLogin}>
-          
+
           {errorMSG && (
             <div className="p-3 bg-red-50 text-red-600 text-sm font-medium rounded-xl border border-red-100 flex items-center justify-center">
               <span className="material-symbols-outlined mr-2 text-base">error</span>
@@ -148,7 +151,7 @@ export default function LoginPage() {
       <div className="fixed top-[10%] left-[5%] w-64 h-64 bg-red-100/40 rounded-full blur-[100px] -z-50 pointer-events-none"></div>
       <div className="fixed bottom-[10%] right-[5%] w-80 h-80 bg-green-100/40 rounded-full blur-[120px] -z-50 pointer-events-none"></div>
 
-      <AlertModal 
+      <AlertModal
         isOpen={showModal}
         title="환영합니다"
         message="성공적으로 로그인되었습니다."

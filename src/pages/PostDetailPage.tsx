@@ -192,7 +192,7 @@ export default function PostDetailPage() {
               <img 
                 alt="Anonymous Avatar" 
                 className="w-full h-full object-cover" 
-                src={post.author_avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuAkl1v2Dxqu2pTqIIBk0o1HMlydFilfM3d_D3Jea0QExxaVA2NobFFlpSOV2L3aWo9g25FBXP_T3hIu55JhSc4cvHYpzoXInjN3dHgWA4yL6Jb5LiDhEPfL1-UgO8H1IXrWUXzZG2zQN7XfV3BQN75x7ZaJkwzJFze4Shp0GYuxiRLRU6hVEwhS6kD9pojzVxbFSJIpR1ODXg25LeOgbhsa2V4sKp-id8VMVy6cxtTCfPv8OW-M4StUZK0VFDD8LAesY6f5oGcFMlg"}
+                src={post.author_avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'}
               />
             </div>
             <div className="flex flex-col">

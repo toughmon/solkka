@@ -337,6 +337,32 @@ app.post('/api/posts/:id/comments', async (req, res) => {
   }
 });
 
+// 7. 사용자 아바타 랜덤 변경
+app.patch('/api/users/:id/avatar', async (req, res) => {
+  const { id } = req.params;
+  const { avatar_url } = req.body;
+
+  if (!avatar_url) {
+    return res.status(400).json({ message: '아바타 URL이 필요합니다.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE solkka.user_account SET avatar_url = $1 WHERE id = $2 RETURNING id',
+      [avatar_url, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, message: '아바타가 성공적으로 변경되었습니다.', avatar_url });
+  } catch (error) {
+    console.error('Update Avatar Error:', error);
+    res.status(500).json({ success: false, message: '아바타 변경 중 오류가 발생했습니다.' });
+  }
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

@@ -19,6 +19,34 @@ export default function MyPage() {
     navigate('/login');
   };
 
+  const handleRefreshAvatar = async () => {
+    if (!user || !user.id) return;
+
+    // Generate a new random seed for DiceBear
+    const randomSeed = Math.random().toString(36).substring(7);
+    const newAvatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}`;
+
+    try {
+      const res = await fetch(`/api/users/${user.id}/avatar`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ avatar_url: newAvatarUrl })
+      });
+
+      if (res.ok) {
+        const updatedUser = { ...user, avatar_url: newAvatarUrl };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      } else {
+        alert('아바타 변경에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('Refresh Avatar Error:', err);
+    }
+  };
+
   return (
     <div className="bg-[#fbf9f8] text-[#313332] min-h-screen pb-32 font-body" style={{ minHeight: 'max(884px, 100dvh)' }}>
       {/* TopAppBar */}
@@ -51,12 +79,21 @@ export default function MyPage() {
         {/* User Profile Summary */}
         <section className="relative overflow-hidden rounded-[2rem] p-8 bg-gradient-to-br from-[#cbe3f7] to-[#f3dedd]">
           <div className="relative z-10 flex flex-col items-center text-center">
-            <div className="w-24 h-24 rounded-full bg-white/40 backdrop-blur-md p-1 mb-4 shadow-sm">
-              <img 
-                alt="Avatar" 
-                className="w-full h-full rounded-full bg-surface-container-lowest object-cover" 
-                src={user?.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuD6vYHgOvNmsq8Y9aTWBdm0W1pWXw-hz8MKLiNL6Z0BiOxp86LaQtiT0hCnOPk-nzF-wLDa8PA6eXFfIV53quZeI_9hc-RVk5U5qBvNOyMROCyJUpjAOEtBeOzM48RzmoGJYfzhimSImzJ3OcjRHaeLjDfebTYeZe4XXYHxBOXMn5WI4LMXPskbWPpse3KZ-aSlDT16CLfS25FAr86X6FdKYugwOvWwIBg-ZFfp0k7WXY7o2yO4iHbkwQBcFC9dkHAS-uD-ICYXQhc"} 
-              />
+            <div className="relative group">
+              <div className="w-24 h-24 rounded-full bg-white/40 backdrop-blur-md p-1 mb-4 shadow-sm overflow-hidden">
+                <img 
+                  alt="Avatar" 
+                  className="w-full h-full rounded-full bg-surface-container-lowest object-cover" 
+                  src={user?.avatar_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23b1b2b1"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'} 
+                />
+              </div>
+              <button 
+                onClick={handleRefreshAvatar}
+                className="absolute bottom-4 right-0 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all z-20 border-2 border-white"
+                title="아바타 새로고침"
+              >
+                <span className="material-symbols-outlined text-sm">refresh</span>
+              </button>
             </div>
             <h2 className="font-headline font-bold text-2xl text-on-primary-container tracking-tight">
               {user ? user.nickname : '익명의 여행자'}

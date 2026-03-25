@@ -235,6 +235,30 @@ app.post('/api/posts', async (req, res) => {
   }
 });
 
+// 3. 게시글 목록 조회
+app.get('/api/posts', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.id, 
+        p.title, 
+        p.content, 
+        p.view_count, 
+        p.like_count, 
+        p.is_counseling_requested,
+        p.created_at,
+        c.name as category_name
+      FROM solkka.post p
+      JOIN solkka.category c ON p.category_id = c.id
+      ORDER BY p.created_at DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Posts Error:', error);
+    res.status(500).json({ message: '게시글 목록을 가져오지 못했습니다.' });
+  }
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

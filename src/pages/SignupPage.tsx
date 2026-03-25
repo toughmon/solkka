@@ -34,7 +34,7 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (data.success) {
-        navigate('/verify', { state: { email } });
+        navigate('/verify', { state: { email, password } });
       } else {
         setError(data.message || '인증 코드 전송에 실패했습니다.');
       }

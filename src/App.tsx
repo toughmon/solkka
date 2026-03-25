@@ -3,6 +3,7 @@ import HomePage from './pages/HomePage';
 import SignupPage from './pages/SignupPage';
 import VerifyPage from './pages/VerifyPage';
 import LoginPage from './pages/LoginPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatPage from './pages/ChatPage';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/chat" element={<ChatPage />} />
       </Routes>
     </BrowserRouter>

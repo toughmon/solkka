@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router';
+import BottomNavBar from '../components/BottomNavBar';
 
 export default function CreatePostPage() {
   const navigate = useNavigate();
@@ -71,6 +72,9 @@ export default function CreatePostPage() {
           src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdjrgn0Ygz9XHKUa0Ax7cur62QzDrdWJAXOGLy5KWcre3IAXjuYTPOYHGEs0CQN4SH8FrecFWNH5H8hle6KLLzainidIVQGGDMRpUr9w67r7MR9j6EU3UKGpbLaI3of2a_cOwXrXg3VB6W70M2VCdVAVItKnEQLSC2FOvpdtzdlV4Ri27Yyk2Ve17miH8CnfGn28hQ_PwJfBc3hAsYCacoj0LXvLLW7hT6AagPi88hj1HQm7OcmWYkh7NNma7Dzxg_5Mo8dTYUVP0"
         />
       </div>
+      
+      {/* BottomNavBar Component */}
+      <BottomNavBar />
     </div>
   );
 }

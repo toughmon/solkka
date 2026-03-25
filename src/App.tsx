@@ -5,6 +5,7 @@ import VerifyPage from './pages/VerifyPage';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatPage from './pages/ChatPage';
+import CreatePostPage from './pages/CreatePostPage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/create" element={<CreatePostPage />} />
       </Routes>
     </BrowserRouter>
   );

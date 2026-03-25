@@ -12,12 +12,16 @@ interface Post {
   created_at: string;
   category_name: string;
   author_nickname?: string;
+  author_avatar_url?: string;
 }
 
 interface Comment {
   id: number;
+  post_id: number;
+  parent_comment_id: number | null;
   content: string;
   author_nickname?: string;
+  author_avatar_url?: string;
   created_at: string;
   like_count: number;
 }
@@ -29,6 +33,7 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [replyTo, setReplyTo] = useState<Comment | null>(null); // 답글 대상 저장
 
   useEffect(() => {
     if (id) {
@@ -78,12 +83,14 @@ export default function PostDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_account_id: user?.id,
-          content: newComment
+          content: newComment,
+          parent_comment_id: replyTo ? replyTo.id : null
         })
       });
 
       if (res.ok) {
         setNewComment('');
+        setReplyTo(null);
         fetchComments(); // 댓글 목록 새로고침
       } else {
         alert('댓글 등록에 실패했습니다.');
@@ -106,6 +113,48 @@ export default function PostDetailPage() {
     if (diffInHours < 24) return `${diffInHours}시간 전`;
     return `${diffInDays}일 전`;
   };
+
+  // Organize comments into parent-child structure (1 level deep)
+  const rootComments = comments.filter(c => !c.parent_comment_id);
+  const getChildComments = (parentId: number) => comments.filter(c => c.parent_comment_id === parentId);
+
+  const renderComment = (comment: Comment, isChild = false) => (
+    <div 
+      key={comment.id} 
+      className={`p-6 rounded-xl shadow-sm space-y-3 transition-all hover:translate-y-[-1px] ${
+        isChild 
+          ? 'bg-surface-container-low ml-8 border-l-4 border-secondary-fixed-dim' 
+          : 'bg-white border border-gray-100'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+          <img 
+            alt="Contributor Avatar" 
+            className="w-full h-full object-cover" 
+            src={comment.author_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_nickname}`}
+          />
+        </div>
+        <span className="font-bold text-sm text-on-surface">{comment.author_nickname || '익명의 리스너'}</span>
+        <span className="text-[10px] text-on-surface-variant font-label ml-auto">{getTimeAgo(comment.created_at)}</span>
+      </div>
+      <p className="text-sm text-on-surface-variant leading-relaxed">
+        {comment.content}
+      </p>
+      <div className="flex items-center gap-4 pt-1">
+        <button 
+          onClick={() => {
+            setReplyTo(comment);
+            // Optional: Scroll to input field
+          }}
+          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+        >
+          <span className="material-symbols-outlined text-xs">reply</span>
+          답글 달기
+        </button>
+      </div>
+    </div>
+  );
 
   if (loading || !post) {
     return (
@@ -136,15 +185,14 @@ export default function PostDetailPage() {
       </header>
 
       <main className="pt-24 px-6 max-w-2xl mx-auto space-y-8">
-        {/* Post Content Section */}
+        {/* Post Content */}
         <article className="space-y-6">
-          {/* Author Meta */}
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-secondary-container flex-shrink-0">
               <img 
                 alt="Anonymous Avatar" 
                 className="w-full h-full object-cover" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkl1v2Dxqu2pTqIIBk0o1HMlydFilfM3d_D3Jea0QExxaVA2NobFFlpSOV2L3aWo9g25FBXP_T3hIu55JhSc4cvHYpzoXInjN3dHgWA4yL6Jb5LiDhEPfL1-UgO8H1IXrWUXzZG2zQN7XfV3BQN75x7ZaJkwzJFze4Shp0GYuxiRLRU6hVEwhS6kD9pojzVxbFSJIpR1ODXg25LeOgbhsa2V4sKp-id8VMVy6cxtTCfPv8OW-M4StUZK0VFDD8LAesY6f5oGcFMlg"
+                src={post.author_avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuAkl1v2Dxqu2pTqIIBk0o1HMlydFilfM3d_D3Jea0QExxaVA2NobFFlpSOV2L3aWo9g25FBXP_T3hIu55JhSc4cvHYpzoXInjN3dHgWA4yL6Jb5LiDhEPfL1-UgO8H1IXrWUXzZG2zQN7XfV3BQN75x7ZaJkwzJFze4Shp0GYuxiRLRU6hVEwhS6kD9pojzVxbFSJIpR1ODXg25LeOgbhsa2V4sKp-id8VMVy6cxtTCfPv8OW-M4StUZK0VFDD8LAesY6f5oGcFMlg"}
               />
             </div>
             <div className="flex flex-col">
@@ -157,23 +205,13 @@ export default function PostDetailPage() {
               </span>
             </div>
           </div>
-          
-          {/* Header */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-headline font-extrabold text-on-surface leading-tight tracking-tight">
-              {post.title}
-            </h2>
+            <h2 className="text-3xl font-headline font-extrabold text-on-surface leading-tight tracking-tight">{post.title}</h2>
             <div className="w-12 h-1 bg-secondary-fixed rounded-full"></div>
           </div>
-
-          {/* Body */}
-          <div className="space-y-4 text-on-surface-variant leading-relaxed text-lg whitespace-pre-wrap">
-            {post.content}
-          </div>
-
-          {/* Interactions */}
+          <div className="space-y-4 text-on-surface-variant leading-relaxed text-lg whitespace-pre-wrap">{post.content}</div>
           <div className="flex items-center gap-6 pt-4">
-            <button className="flex items-center gap-2 px-5 py-3 bg-surface-container-low rounded-xl hover:bg-surface-container transition-all group border border-outline-variant/10">
+            <button className="flex items-center gap-2 px-5 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
               <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
               <span className="font-bold text-sm text-on-surface">{post.like_count}</span>
             </button>
@@ -184,39 +222,20 @@ export default function PostDetailPage() {
           </div>
         </article>
 
-        {/* Divider with spacing */}
         <div className="h-4 border-b border-gray-100"></div>
 
         {/* Comments Section */}
-        <section className="space-y-6">
+        <section className="space-y-6 pb-20">
           <h3 className="font-headline font-bold text-xl text-primary flex items-center gap-2">
             Echoes of Support
             <span className="w-2 h-2 rounded-full bg-secondary"></span>
           </h3>
-          
-          <div className="space-y-4">
-            {comments.length > 0 ? (
-              comments.map((comment, index) => (
-                <div 
-                  key={comment.id} 
-                  className={`p-6 rounded-xl shadow-sm space-y-3 transition-all hover:translate-y-[-1px] ${
-                    index % 2 === 1 ? 'bg-surface-container-low ml-4 border-l-4 border-secondary-fixed-dim' : 'bg-white border border-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
-                      <img 
-                        alt="Contributor Avatar" 
-                        className="w-full h-full object-cover" 
-                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author_nickname}`}
-                      />
-                    </div>
-                    <span className="font-bold text-sm text-on-surface">{comment.author_nickname || '익명의 리스너'}</span>
-                    <span className="text-[10px] text-on-surface-variant font-label ml-auto">{getTimeAgo(comment.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-on-surface-variant leading-relaxed">
-                    {comment.content}
-                  </p>
+          <div className="space-y-6">
+            {rootComments.length > 0 ? (
+              rootComments.map(root => (
+                <div key={`group-${root.id}`} className="space-y-4">
+                  {renderComment(root)}
+                  {getChildComments(root.id).map(child => renderComment(child, true))}
                 </div>
               ))
             ) : (
@@ -227,14 +246,28 @@ export default function PostDetailPage() {
           </div>
         </section>
 
-        {/* New Comment Input (Glassy floating bar) */}
+        {/* Input Bar (Floating) */}
         <div className="fixed bottom-24 left-6 right-6 z-40 max-w-2xl mx-auto">
+          {replyTo && (
+            <div className="bg-primary/5 border-l-4 border-primary px-4 py-2 mb-2 rounded-r-lg flex justify-between items-center animate-fade-in backdrop-blur-sm">
+              <p className="text-xs text-primary font-bold">
+                <span className="font-normal opacity-70">Replying to:</span> {replyTo.author_nickname || '익명'} 💬
+              </p>
+              <button 
+                onClick={() => setReplyTo(null)}
+                className="text-xs text-outline-variant hover:text-error"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           <div className="bg-white/80 backdrop-blur-md rounded-2xl p-2 flex items-center gap-3 shadow-xl border border-white/40">
             <input 
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
               className="flex-grow bg-transparent border-none focus:ring-0 text-sm py-2 px-3 text-on-surface font-body" 
-              placeholder="따뜻한 한마디를 남겨주세요..." 
+              placeholder={replyTo ? `${replyTo.author_nickname}님에게 답글 남기기...` : "따뜻한 한마디를 남겨주세요..."}
               type="text"
             />
             <button 

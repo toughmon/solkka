@@ -133,13 +133,16 @@ app.post('/api/auth/verify', async (req, res) => {
     // (단방향 암호화: bcrypt를 이용한 패스워드 해싱, salt rounds = 10)
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // 4. user_account 테이블에 영구 저장
+    // 4. 랜덤 아바타 생성 (DiceBear API)
+    const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomNickname}`;
+
+    // 5. user_account 테이블에 영구 저장
     await pool.query(
-      'INSERT INTO solkka.user_account (email, password_hash, nickname) VALUES ($1, $2, $3)',
-      [email, passwordHash, randomNickname]
+      'INSERT INTO solkka.user_account (email, password_hash, nickname, avatar_url) VALUES ($1, $2, $3, $4)',
+      [email, passwordHash, randomNickname, avatarUrl]
     );
 
-    // 5. 사용된 인증 코드 파기
+    // 6. 사용된 인증 코드 파기
     await pool.query('DELETE FROM solkka.email_verification WHERE email = $1', [email]);
 
     res.json({ success: true, message: '회원가입이 성공적으로 완료되었습니다!', nickname: randomNickname });
@@ -164,7 +167,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, email, password_hash, nickname FROM solkka.user_account WHERE email = $1',
+      'SELECT id, email, password_hash, nickname, avatar_url FROM solkka.user_account WHERE email = $1',
       [email]
     );
 
@@ -186,7 +189,8 @@ app.post('/api/auth/login', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        nickname: user.nickname
+        nickname: user.nickname,
+        avatar_url: user.avatar_url
       }
     });
 
@@ -247,9 +251,11 @@ app.get('/api/posts', async (req, res) => {
         p.like_count, 
         p.is_counseling_requested,
         p.created_at,
-        c.name as category_name
+        c.name as category_name,
+        u.avatar_url as author_avatar_url
       FROM solkka.post p
       JOIN solkka.category c ON p.category_id = c.id
+      LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
       ORDER BY p.created_at DESC
     `);
     res.json(result.rows);
@@ -267,7 +273,8 @@ app.get('/api/posts/:id', async (req, res) => {
       SELECT 
         p.*, 
         c.name as category_name,
-        u.nickname as author_nickname
+        u.nickname as author_nickname,
+        u.avatar_url as author_avatar_url
       FROM solkka.post p
       JOIN solkka.category c ON p.category_id = c.id
       LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
@@ -291,7 +298,8 @@ app.get('/api/posts/:id/comments', async (req, res) => {
     const result = await pool.query(`
       SELECT 
         c.*, 
-        u.nickname as author_nickname
+        u.nickname as author_nickname,
+        u.avatar_url as author_avatar_url
       FROM solkka.comment c
       LEFT JOIN solkka.user_account u ON c.user_account_id = u.id
       WHERE c.post_id = $1

@@ -55,7 +55,7 @@ export default function MyPage() {
               <img 
                 alt="Avatar" 
                 className="w-full h-full rounded-full bg-surface-container-lowest object-cover" 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6vYHgOvNmsq8Y9aTWBdm0W1pWXw-hz8MKLiNL6Z0BiOxp86LaQtiT0hCnOPk-nzF-wLDa8PA6eXFfIV53quZeI_9hc-RVk5U5qBvNOyMROCyJUpjAOEtBeOzM48RzmoGJYfzhimSImzJ3OcjRHaeLjDfebTYeZe4XXYHxBOXMn5WI4LMXPskbWPpse3KZ-aSlDT16CLfS25FAr86X6FdKYugwOvWwIBg-ZFfp0k7WXY7o2yO4iHbkwQBcFC9dkHAS-uD-ICYXQhc" 
+                src={user?.avatar_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuD6vYHgOvNmsq8Y9aTWBdm0W1pWXw-hz8MKLiNL6Z0BiOxp86LaQtiT0hCnOPk-nzF-wLDa8PA6eXFfIV53quZeI_9hc-RVk5U5qBvNOyMROCyJUpjAOEtBeOzM48RzmoGJYfzhimSImzJ3OcjRHaeLjDfebTYeZe4XXYHxBOXMn5WI4LMXPskbWPpse3KZ-aSlDT16CLfS25FAr86X6FdKYugwOvWwIBg-ZFfp0k7WXY7o2yO4iHbkwQBcFC9dkHAS-uD-ICYXQhc"} 
               />
             </div>
             <h2 className="font-headline font-bold text-2xl text-on-primary-container tracking-tight">

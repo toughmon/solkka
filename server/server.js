@@ -154,6 +154,40 @@ app.post('/api/auth/verify', async (req, res) => {
   }
 });
 
+// 3. 로그인 API
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: '이메일과 비밀번호를 모두 입력해주세요.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id, email, password_hash, nickname FROM solkka.user_account WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ success: false, message: '가입되지 않은 이메일이거나 비밀번호가 틀렸습니다.' });
+    }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: '가입되지 않은 이메일이거나 비밀번호가 틀렸습니다.' });
+    }
+
+    // TODO: JWT 토큰 발급 또는 세션 처리. 임시로 성공 메시지만 넘김
+    res.json({ success: true, message: '로그인 성공', nickname: user.nickname });
+
+  } catch (error) {
+    console.error('Login Error:', error);
+    res.status(500).json({ success: false, message: '로그인 처리 중 서버 오류가 발생했습니다.' });
+  }
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

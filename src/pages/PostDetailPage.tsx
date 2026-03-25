@@ -114,18 +114,17 @@ export default function PostDetailPage() {
     return `${diffInDays}일 전`;
   };
 
-  // Organize comments into parent-child structure (1 level deep)
-  const rootComments = comments.filter(c => !c.parent_comment_id);
-  const getChildComments = (parentId: number) => comments.filter(c => c.parent_comment_id === parentId);
-
-  const renderComment = (comment: Comment, isChild = false) => (
+  // Organize comments into recursively rendered tree structure
+  
+  const renderComment = (comment: Comment, depth = 0) => (
     <div 
       key={comment.id} 
       className={`p-6 rounded-xl shadow-sm space-y-3 transition-all hover:translate-y-[-1px] ${
-        isChild 
-          ? 'bg-surface-container-low ml-8 border-l-4 border-secondary-fixed-dim' 
+        depth > 0 
+          ? `bg-surface-container-low border-l-4 border-secondary-fixed-dim` 
           : 'bg-white border border-gray-100'
       }`}
+      style={{ marginLeft: depth > 0 ? `${Math.min(depth * 1.5, 4)}rem` : '0' }}
     >
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
@@ -155,6 +154,17 @@ export default function PostDetailPage() {
       </div>
     </div>
   );
+
+  const renderCommentTree = (parentId: number | null, depth = 0) => {
+    return comments
+      .filter(c => c.parent_comment_id === parentId)
+      .map(comment => (
+        <div key={`group-${comment.id}`} className="space-y-4">
+          {renderComment(comment, depth)}
+          {renderCommentTree(comment.id, depth + 1)}
+        </div>
+      ));
+  };
 
   if (loading || !post) {
     return (
@@ -231,13 +241,8 @@ export default function PostDetailPage() {
             <span className="w-2 h-2 rounded-full bg-secondary"></span>
           </h3>
           <div className="space-y-6">
-            {rootComments.length > 0 ? (
-              rootComments.map(root => (
-                <div key={`group-${root.id}`} className="space-y-4">
-                  {renderComment(root)}
-                  {getChildComments(root.id).map(child => renderComment(child, true))}
-                </div>
-              ))
+            {comments.length > 0 ? (
+              renderCommentTree(null)
             ) : (
               <div className="text-center py-10 text-on-surface-variant/60 italic">
                 아직 도착한 위로가 없습니다. 첫마디를 건네보세요.

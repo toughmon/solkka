@@ -22,10 +22,10 @@ export default function BottomNavBar() {
         <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">게시글</span>
       </Link>
 
-      {/* Chats / Create (Or Forum) */}
+      {/* Create Post */}
       <Link className={isActive('/create') ? activeClass : inactiveClass} to="/create">
-        <span className="material-symbols-outlined mb-1 shrink-0">forum</span>
-        <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">채팅</span>
+        <span className="material-symbols-outlined mb-1 shrink-0">add_circle</span>
+        <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">글쓰기</span>
       </Link>
 
       {/* Profile */}

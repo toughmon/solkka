@@ -24,6 +24,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
+        localStorage.setItem('user', JSON.stringify(data.user));
         setShowModal(true);
       } else {
         setErrorMSG(data.message || '로그인에 실패했습니다.');

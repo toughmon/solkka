@@ -1,7 +1,9 @@
+import { useNavigate } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar from '../components/BottomNavBar';
 
 export default function HomePage() {
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-surface font-body text-on-surface pb-32">
       <TopAppBar />
@@ -163,6 +165,23 @@ export default function HomePage() {
       </main>
 
       <BottomNavBar />
+
+      {/* Floating Action Button for Create Post */}
+      <button 
+        onClick={() => navigate('/create')}
+        className="fixed bottom-28 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 md:hidden"
+      >
+        <span className="material-symbols-outlined text-3xl">add</span>
+      </button>
+
+      {/* Desktop Version FAB / Button */}
+      <button 
+        onClick={() => navigate('/create')}
+        className="fixed bottom-10 right-10 hidden md:flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full shadow-xl hover:bg-primary-dim transition-all z-40 group"
+      >
+        <span className="material-symbols-outlined group-hover:rotate-90 transition-transform">add</span>
+        <span className="font-headline font-bold">새 글 작성</span>
+      </button>
     </div>
   );
 }

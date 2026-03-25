@@ -1,8 +1,23 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNavBar from '../components/BottomNavBar';
 
 export default function MyPage() {
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      setUser(JSON.parse(userData));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    alert('로그아웃 되었습니다.');
+    navigate('/login');
+  };
 
   return (
     <div className="bg-[#fbf9f8] text-[#313332] min-h-screen pb-32 font-body" style={{ minHeight: 'max(884px, 100dvh)' }}>
@@ -19,6 +34,12 @@ export default function MyPage() {
             <h1 className="font-headline font-semibold text-lg tracking-tight text-[#4c6272] dark:text-[#a5c8df]">마이페이지</h1>
           </div>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={handleLogout}
+              className="text-red-500 font-medium text-sm hover:opacity-80 transition-opacity"
+            >
+              로그아웃
+            </button>
             <button className="text-[#4c6272] dark:text-[#a5c8df] hover:opacity-80 transition-opacity">
               <span className="material-symbols-outlined shrink-0" style={{ display: 'inline-block', lineHeight: 1 }}>settings</span>
             </button>
@@ -37,8 +58,12 @@ export default function MyPage() {
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6vYHgOvNmsq8Y9aTWBdm0W1pWXw-hz8MKLiNL6Z0BiOxp86LaQtiT0hCnOPk-nzF-wLDa8PA6eXFfIV53quZeI_9hc-RVk5U5qBvNOyMROCyJUpjAOEtBeOzM48RzmoGJYfzhimSImzJ3OcjRHaeLjDfebTYeZe4XXYHxBOXMn5WI4LMXPskbWPpse3KZ-aSlDT16CLfS25FAr86X6FdKYugwOvWwIBg-ZFfp0k7WXY7o2yO4iHbkwQBcFC9dkHAS-uD-ICYXQhc" 
               />
             </div>
-            <h2 className="font-headline font-bold text-2xl text-on-primary-container tracking-tight">익명의 여행자</h2>
-            <p className="font-body text-sm text-on-primary-container/70 mt-1">2023년 10월부터 함께 위로를 나누고 있습니다</p>
+            <h2 className="font-headline font-bold text-2xl text-on-primary-container tracking-tight">
+              {user ? user.nickname : '익명의 여행자'}
+            </h2>
+            <p className="font-body text-sm text-on-primary-container/70 mt-1">
+              {user ? user.email : '로그인이 필요합니다'}
+            </p>
             <div className="mt-6 flex gap-3">
               <span className="px-4 py-1.5 bg-tertiary-container text-on-tertiary-container text-xs font-semibold rounded-full">
                 레벨 4 리스너

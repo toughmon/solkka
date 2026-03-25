@@ -180,11 +180,58 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // TODO: JWT 토큰 발급 또는 세션 처리. 임시로 성공 메시지만 넘김
-    res.json({ success: true, message: '로그인 성공', nickname: user.nickname });
+    res.json({ 
+      success: true, 
+      message: '로그인 성공', 
+      user: {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname
+      }
+    });
 
   } catch (error) {
     console.error('Login Error:', error);
     res.status(500).json({ success: false, message: '로그인 처리 중 서버 오류가 발생했습니다.' });
+  }
+});
+
+/* ================================
+   게시글(Post) 관련 API
+================================ */
+
+// 1. 카테고리 목록 조회
+app.get('/api/categories', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, description FROM solkka.category ORDER BY id ASC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Categories Error:', error);
+    res.status(500).json({ message: '카테고리 정보를 가져오지 못했습니다.' });
+  }
+});
+
+// 2. 게시글 작성
+app.post('/api/posts', async (req, res) => {
+  const { user_account_id, category_id, title, content, is_counseling_requested } = req.body;
+
+  if (!category_id || !title || !content) {
+    return res.status(400).json({ message: '카테고리, 제목, 본문은 필수 입력 사항입니다.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO solkka.post 
+       (user_account_id, category_id, title, content, is_counseling_requested) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id`,
+      [user_account_id || null, category_id, title, content, is_counseling_requested || false]
+    );
+
+    res.json({ success: true, message: '게시글이 성공적으로 등록되었습니다.', postId: result.rows[0].id });
+  } catch (error) {
+    console.error('Create Post Error:', error);
+    res.status(500).json({ success: false, message: '게시글 등록 중 오류가 발생했습니다.' });
   }
 });
 

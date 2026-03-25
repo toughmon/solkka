@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ChatPage from './pages/ChatPage';
 import CreatePostPage from './pages/CreatePostPage';
+import PostDetailPage from './pages/PostDetailPage';
 import MyPage from './pages/MyPage';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/create" element={<CreatePostPage />} />
+        <Route path="/post/:id" element={<PostDetailPage />} />
         <Route path="/mypage" element={<MyPage />} />
       </Routes>
     </BrowserRouter>

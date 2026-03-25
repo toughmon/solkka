@@ -259,6 +259,76 @@ app.get('/api/posts', async (req, res) => {
   }
 });
 
+// 4. 단일 게시글 상세 조회
+app.get('/api/posts/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.*, 
+        c.name as category_name,
+        u.nickname as author_nickname
+      FROM solkka.post p
+      JOIN solkka.category c ON p.category_id = c.id
+      LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
+      WHERE p.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Fetch Post Detail Error:', error);
+    res.status(500).json({ message: '게시글 정보를 가져오지 못했습니다.' });
+  }
+});
+
+// 5. 특정 게시글의 댓글 목록 조회
+app.get('/api/posts/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(`
+      SELECT 
+        c.*, 
+        u.nickname as author_nickname
+      FROM solkka.comment c
+      LEFT JOIN solkka.user_account u ON c.user_account_id = u.id
+      WHERE c.post_id = $1
+      ORDER BY c.created_at ASC
+    `, [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Comments Error:', error);
+    res.status(500).json({ message: '댓글 목록을 가져오지 못했습니다.' });
+  }
+});
+
+// 6. 댓글 작성
+app.post('/api/posts/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const { user_account_id, content, parent_comment_id } = req.body;
+
+  if (!content) {
+    return res.status(400).json({ message: '댓글 내용을 입력해주세요.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO solkka.comment 
+       (post_id, user_account_id, content, parent_comment_id) 
+       VALUES ($1, $2, $3, $4) 
+       RETURNING id`,
+      [id, user_account_id || null, content, parent_comment_id || null]
+    );
+
+    res.json({ success: true, message: '댓글이 등록되었습니다.', commentId: result.rows[0].id });
+  } catch (error) {
+    console.error('Create Comment Error:', error);
+    res.status(500).json({ success: false, message: '댓글 등록 중 오류가 발생했습니다.' });
+  }
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

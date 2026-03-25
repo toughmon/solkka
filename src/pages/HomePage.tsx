@@ -110,7 +110,11 @@ export default function HomePage() {
                 
                 return posts.map((post, index) => {
                   const postElement = (
-                    <article key={post.id} className="bg-surface-container-lowest p-6 rounded-xl space-y-4 transition-all hover:translate-y-[-2px] hover:shadow-sm border border-outline-variant/5">
+                    <article 
+                      key={post.id} 
+                      onClick={() => navigate(`/post/${post.id}`)}
+                      className="bg-surface-container-lowest p-6 rounded-xl space-y-4 transition-all hover:translate-y-[-2px] hover:shadow-md border border-outline-variant/5 cursor-pointer"
+                    >
                       <div className="flex justify-between items-start">
                         <span className="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase">
                           {post.category_name}

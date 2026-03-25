@@ -62,3 +62,18 @@ CREATE TABLE IF NOT EXISTS post (
 
 CREATE INDEX IF NOT EXISTS idx_post_category ON post(category_id);
 CREATE INDEX IF NOT EXISTS idx_post_user_account ON post(user_account_id);
+
+-- 5. 댓글(comment) 테이블 추가
+CREATE TABLE IF NOT EXISTS comment (
+  id SERIAL PRIMARY KEY,
+  post_id INT REFERENCES post(id) ON DELETE CASCADE,
+  user_account_id INT REFERENCES user_account(id) ON DELETE SET NULL,
+  parent_comment_id INT REFERENCES comment(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  like_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_comment_post ON comment(post_id);
+CREATE INDEX IF NOT EXISTS idx_comment_parent ON comment(parent_comment_id);

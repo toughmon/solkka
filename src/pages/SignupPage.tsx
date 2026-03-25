@@ -1,4 +1,49 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router';
+
 export default function SignupPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // 유효성 검사
+    if (!email || !password || !confirmPassword) {
+      return setError('모든 항목을 입력해주세요.');
+    }
+    if (password.length < 8) {
+      return setError('비밀번호는 최소 8자 이상이어야 합니다.');
+    }
+    if (password !== confirmPassword) {
+      return setError('비밀번호가 일치하지 않습니다.');
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        navigate('/verify', { state: { email } });
+      } else {
+        setError(data.message || '인증 코드 전송에 실패했습니다.');
+      }
+    } catch (err) {
+      setError('서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인하세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col relative overflow-hidden">
       {/* Background Atmospheric Images - fixed z-index to stay behind everything */}
@@ -22,7 +67,8 @@ export default function SignupPage() {
       <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-surface-container-low flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => window.history.back()}
+            type="button"
+            onClick={() => navigate(-1)}
             className="flex items-center justify-center p-2 rounded-full hover:bg-surface-container transition-all duration-300 active:scale-95 text-primary"
           >
             <span className="material-symbols-outlined">arrow_back</span>
@@ -46,26 +92,62 @@ export default function SignupPage() {
           </section>
 
           <div className="bg-white rounded-2xl p-8 space-y-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 relative">
-            <form className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              
+              {error && (
+                <div className="p-3 bg-error-container/20 text-error rounded-xl text-sm font-bold text-center">
+                  {error}
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="block text-sm font-bold text-gray-700 px-1 font-label">이메일 주소</label>
                 <div className="relative group">
-                  <input className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 outline-none" placeholder="hello@solkka.com" type="email" />
+                  <input 
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 outline-none" 
+                    placeholder="hello@solkka.com" 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
               </div>
 
               <div className="space-y-1.5">
                 <label className="block text-sm font-bold text-gray-700 px-1 font-label">비밀번호</label>
                 <div className="relative group">
-                  <input className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 outline-none" placeholder="••••••••" type="password" />
+                  <input 
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 outline-none" 
+                    placeholder="••••••••" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
                 </div>
-                <p className="text-xs text-gray-500 px-1 pt-1">특수문자 포함 최소 8자</p>
+                <p className="text-xs text-gray-500 px-1 pt-1">최소 8자 이상</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-sm font-bold text-gray-700 px-1 font-label">비밀번호 확인</label>
+                <div className="relative group">
+                  <input 
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 outline-none" 
+                    placeholder="••••••••" 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="pt-2">
-                <button className="bg-primary hover:bg-[#3d4f5c] w-full py-4 rounded-xl text-white font-headline font-bold text-lg shadow-md active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2" type="button">
-                  다음
-                  <span className="material-symbols-outlined text-xl">chevron_right</span>
+                <button 
+                  type="submit"
+                  disabled={isLoading}
+                  className={`w-full py-4 rounded-xl text-white font-headline font-bold text-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 ${isLoading ? 'bg-primary-dim opacity-70 cursor-not-allowed' : 'bg-primary hover:bg-[#3d4f5c] active:scale-[0.98]'}`}
+                >
+                  {isLoading ? '발송 중...' : '인증 코드 보내기'}
+                  {!isLoading && <span className="material-symbols-outlined text-xl">chevron_right</span>}
                 </button>
               </div>
             </form>
@@ -73,7 +155,7 @@ export default function SignupPage() {
             <div className="text-center">
               <p className="text-sm text-gray-600">
                 이미 계정이 있으신가요? 
-                <a className="text-primary font-bold hover:underline ml-1" href="#">로그인</a>
+                <Link className="text-primary font-bold hover:underline ml-1" to="/login">로그인</Link>
               </p>
             </div>
           </div>

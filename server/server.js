@@ -12,6 +12,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Global Request Logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // 1. PostgreSQL DB 연결 풀
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
@@ -241,6 +247,7 @@ app.post('/api/posts', async (req, res) => {
 
 // 3. 게시글 목록 조회
 app.get('/api/posts', async (req, res) => {
+  const { user_id } = req.query;
   try {
     const result = await pool.query(`
       SELECT 
@@ -252,12 +259,13 @@ app.get('/api/posts', async (req, res) => {
         p.is_counseling_requested,
         p.created_at,
         c.name as category_name,
-        u.avatar_url as author_avatar_url
+        u.avatar_url as author_avatar_url,
+        EXISTS(SELECT 1 FROM solkka.post_like WHERE post_id = p.id AND user_account_id = $1) as is_liked
       FROM solkka.post p
       JOIN solkka.category c ON p.category_id = c.id
       LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
       ORDER BY p.created_at DESC
-    `);
+    `, [user_id || null]);
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch Posts Error:', error);
@@ -268,18 +276,20 @@ app.get('/api/posts', async (req, res) => {
 // 4. 단일 게시글 상세 조회
 app.get('/api/posts/:id', async (req, res) => {
   const { id } = req.params;
+  const { user_id } = req.query;
   try {
     const result = await pool.query(`
       SELECT 
         p.*, 
         c.name as category_name,
         u.nickname as author_nickname,
-        u.avatar_url as author_avatar_url
+        u.avatar_url as author_avatar_url,
+        EXISTS(SELECT 1 FROM solkka.post_like WHERE post_id = p.id AND user_account_id = $2) as is_liked
       FROM solkka.post p
       JOIN solkka.category c ON p.category_id = c.id
       LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
       WHERE p.id = $1
-    `, [id]);
+    `, [id, user_id || null]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
@@ -294,17 +304,19 @@ app.get('/api/posts/:id', async (req, res) => {
 // 5. 특정 게시글의 댓글 목록 조회
 app.get('/api/posts/:id/comments', async (req, res) => {
   const { id } = req.params;
+  const { user_id } = req.query;
   try {
     const result = await pool.query(`
       SELECT 
         c.*, 
         u.nickname as author_nickname,
-        u.avatar_url as author_avatar_url
+        u.avatar_url as author_avatar_url,
+        EXISTS(SELECT 1 FROM solkka.comment_like WHERE comment_id = c.id AND user_account_id = $2) as is_liked
       FROM solkka.comment c
       LEFT JOIN solkka.user_account u ON c.user_account_id = u.id
       WHERE c.post_id = $1
       ORDER BY c.created_at ASC
-    `, [id]);
+    `, [id, user_id || null]);
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch Comments Error:', error);
@@ -360,6 +372,109 @@ app.patch('/api/users/:id/avatar', async (req, res) => {
   } catch (error) {
     console.error('Update Avatar Error:', error);
     res.status(500).json({ success: false, message: '아바타 변경 중 오류가 발생했습니다.' });
+  }
+});
+
+// 8. 게시글 좋아요 토글
+app.post('/api/posts/:id/like', async (req, res) => {
+  const { id } = req.params;
+  const { user_account_id } = req.body;
+
+  if (!user_account_id) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // 이미 좋아요를 눌렀는지 확인
+    const check = await client.query(
+      'SELECT 1 FROM solkka.post_like WHERE user_account_id = $1 AND post_id = $2',
+      [user_account_id, id]
+    );
+
+    if (check.rows.length > 0) {
+      // 이미 있으면 삭제 (취소)
+      await client.query(
+        'DELETE FROM solkka.post_like WHERE user_account_id = $1 AND post_id = $2',
+        [user_account_id, id]
+      );
+      await client.query(
+        'UPDATE solkka.post SET like_count = like_count - 1 WHERE id = $1',
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, liked: false });
+    } else {
+      // 없으면 추가
+      await client.query(
+        'INSERT INTO solkka.post_like (user_account_id, post_id) VALUES ($1, $2)',
+        [user_account_id, id]
+      );
+      await client.query(
+        'UPDATE solkka.post SET like_count = like_count + 1 WHERE id = $1',
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, liked: true });
+    }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Post Like Toggle Error:', error);
+    res.status(500).json({ message: '좋아요 처리에 실패했습니다.' });
+  } finally {
+    client.release();
+  }
+});
+
+// 9. 댓글 좋아요 토글
+app.post('/api/comments/:id/like', async (req, res) => {
+  const { id } = req.params;
+  const { user_account_id } = req.body;
+
+  if (!user_account_id) {
+    return res.status(401).json({ message: '로그인이 필요합니다.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    const check = await client.query(
+      'SELECT 1 FROM solkka.comment_like WHERE user_account_id = $1 AND comment_id = $2',
+      [user_account_id, id]
+    );
+
+    if (check.rows.length > 0) {
+      await client.query(
+        'DELETE FROM solkka.comment_like WHERE user_account_id = $1 AND comment_id = $2',
+        [user_account_id, id]
+      );
+      await client.query(
+        'UPDATE solkka.comment SET like_count = like_count - 1 WHERE id = $1',
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, liked: false });
+    } else {
+      await client.query(
+        'INSERT INTO solkka.comment_like (user_account_id, comment_id) VALUES ($1, $2)',
+        [user_account_id, id]
+      );
+      await client.query(
+        'UPDATE solkka.comment SET like_count = like_count + 1 WHERE id = $1',
+        [id]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, liked: true });
+    }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Comment Like Toggle Error:', error);
+    res.status(500).json({ message: '좋아요 처리에 실패했습니다.' });
+  } finally {
+    client.release();
   }
 });
 

@@ -13,6 +13,7 @@ interface Post {
   category_name: string;
   author_nickname?: string;
   author_avatar_url?: string;
+  is_liked: boolean;
 }
 
 interface Comment {
@@ -24,6 +25,7 @@ interface Comment {
   author_avatar_url?: string;
   created_at: string;
   like_count: number;
+  is_liked: boolean;
 }
 
 export default function PostDetailPage() {
@@ -44,7 +46,11 @@ export default function PostDetailPage() {
 
   const fetchPostDetail = async () => {
     try {
-      const res = await fetch(`/api/posts/${id}`);
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+      const userIdParam = user ? `?user_id=${user.id}` : '';
+
+      const res = await fetch(`/api/posts/${id}${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setPost(data);
@@ -59,7 +65,11 @@ export default function PostDetailPage() {
 
   const fetchComments = async () => {
     try {
-      const res = await fetch(`/api/posts/${id}/comments`);
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+      const userIdParam = user ? `?user_id=${user.id}` : '';
+
+      const res = await fetch(`/api/posts/${id}/comments${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setComments(data);
@@ -68,6 +78,71 @@ export default function PostDetailPage() {
       console.error('Fetch Comments Error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLikePost = async () => {
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+
+    if (!user) {
+      alert('좋아요를 누르려면 로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/posts/${id}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_account_id: user.id })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPost(prev => prev ? {
+          ...prev,
+          is_liked: data.liked,
+          like_count: data.liked ? prev.like_count + 1 : prev.like_count - 1
+        } : null);
+      }
+    } catch (err) {
+      console.error('Post Like toggle error:', err);
+    }
+  };
+
+  const handleLikeComment = async (commentId: number) => {
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+
+    if (!user) {
+      alert('좋아요를 누르려면 로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/comments/${commentId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_account_id: user.id })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setComments(prev => prev.map(c => {
+          if (c.id === commentId) {
+            return {
+              ...c,
+              is_liked: data.liked,
+              like_count: data.liked ? c.like_count + 1 : c.like_count - 1
+            };
+          }
+          return c;
+        }));
+      }
+    } catch (err) {
+      console.error('Comment Like toggle error:', err);
     }
   };
 
@@ -141,6 +216,13 @@ export default function PostDetailPage() {
         {comment.content}
       </p>
       <div className="flex items-center gap-4 pt-1">
+        <button 
+          onClick={() => handleLikeComment(comment.id)}
+          className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
+        >
+          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+          <span className="text-[10px] font-bold">{comment.like_count}</span>
+        </button>
         <button 
           onClick={() => {
             setReplyTo(comment);
@@ -221,9 +303,16 @@ export default function PostDetailPage() {
           </div>
           <div className="space-y-4 text-on-surface-variant leading-relaxed text-lg whitespace-pre-wrap">{post.content}</div>
           <div className="flex items-center gap-6 pt-4">
-            <button className="flex items-center gap-2 px-5 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
-              <span className="material-symbols-outlined text-error" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-              <span className="font-bold text-sm text-on-surface">{post.like_count}</span>
+            <button 
+              onClick={handleLikePost}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl border transition-all ${
+                post.is_liked 
+                  ? 'bg-error-container border-error text-on-error-container' 
+                  : 'bg-surface-container-low border-outline-variant/10 text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: post.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+              <span className="font-bold text-sm tracking-tight">{post.like_count}</span>
             </button>
             <div className="flex items-center gap-2 px-5 py-3 bg-surface-container-low rounded-xl border border-outline-variant/10">
               <span className="material-symbols-outlined text-primary">chat_bubble</span>

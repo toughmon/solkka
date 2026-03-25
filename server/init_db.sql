@@ -77,3 +77,19 @@ CREATE TABLE IF NOT EXISTS comment (
 
 CREATE INDEX IF NOT EXISTS idx_comment_post ON comment(post_id);
 CREATE INDEX IF NOT EXISTS idx_comment_parent ON comment(parent_comment_id);
+
+-- 6. 게시글 좋아요(post_like) 테이블
+CREATE TABLE IF NOT EXISTS post_like (
+  user_account_id INT REFERENCES user_account(id) ON DELETE CASCADE,
+  post_id INT REFERENCES post(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_account_id, post_id)
+);
+
+-- 7. 댓글 좋아요(comment_like) 테이블
+CREATE TABLE IF NOT EXISTS comment_like (
+  user_account_id INT REFERENCES user_account(id) ON DELETE CASCADE,
+  comment_id INT REFERENCES comment(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_account_id, comment_id)
+);

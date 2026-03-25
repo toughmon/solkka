@@ -12,6 +12,7 @@ interface Post {
   is_counseling_requested: boolean;
   created_at: string;
   category_name: string;
+  is_liked: boolean;
 }
 
 export default function HomePage() {
@@ -25,7 +26,11 @@ export default function HomePage() {
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch('/api/posts');
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+      const userIdParam = user ? `?user_id=${user.id}` : '';
+
+      const res = await fetch(`/api/posts${userIdParam}`);
       if (res.ok) {
         const data = await res.json();
         setPosts(data);
@@ -34,6 +39,44 @@ export default function HomePage() {
       console.error('Failed to fetch posts:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLikePost = async (e: React.MouseEvent, postId: number) => {
+    e.stopPropagation(); // Prevent navigating to detail page
+
+    const userData = localStorage.getItem('user');
+    const user = userData ? JSON.parse(userData) : null;
+
+    if (!user) {
+      alert('좋아요를 누르려면 로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_account_id: user.id })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Update local state for immediate feedback
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
+            return {
+              ...p,
+              is_liked: data.liked,
+              like_count: data.liked ? p.like_count + 1 : p.like_count - 1
+            };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.error('Like toggle error:', err);
     }
   };
 
@@ -51,7 +94,6 @@ export default function HomePage() {
     return `${diffInDays}일 전`;
   };
 
-  // Helper to render the support/affirmation card
   const renderSupportCard = () => (
     <div key="support-card" className="relative overflow-hidden bg-secondary-fixed text-on-secondary-fixed p-6 rounded-2xl flex items-center gap-4 transition-all hover:shadow-md">
       <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-secondary-fixed-dim/30 rounded-full blur-3xl"></div>
@@ -70,7 +112,6 @@ export default function HomePage() {
       <TopAppBar />
 
       <main className="pt-24 px-5 max-w-2xl mx-auto space-y-8">
-        {/* Welcome Section */}
         <section className="space-y-2">
           <h2 className="text-3xl font-headline font-semibold text-primary tracking-tight">Solkka</h2>
           <p className="text-on-surface-variant text-sm max-w-[85%] leading-relaxed">
@@ -78,7 +119,6 @@ export default function HomePage() {
           </p>
         </section>
 
-        {/* Filter Chips - Mock for now */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-5 px-5">
           <button className="flex-shrink-0 px-6 py-2.5 rounded-full bg-primary text-on-primary font-medium text-sm transition-all shadow-sm">
             전체
@@ -90,7 +130,6 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Post List */}
         <div className="space-y-6">
           {loading ? (
             <div className="space-y-4">
@@ -105,7 +144,6 @@ export default function HomePage() {
           ) : posts.length > 0 ? (
             <>
               {(() => {
-                // Randomly decide where to insert the support card (between 1 and posts.length-1)
                 const supportIndex = Math.floor(Math.random() * (posts.length)) || (posts.length > 0 ? 0 : -1);
                 
                 return posts.map((post, index) => {
@@ -134,8 +172,11 @@ export default function HomePage() {
                       </div>
                       <div className="flex items-center justify-between pt-2">
                         <div className="flex items-center gap-6">
-                          <button className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors group">
-                            <span className="material-symbols-outlined text-lg">favorite</span>
+                          <button 
+                            onClick={(e) => handleLikePost(e, post.id)}
+                            className={`flex items-center gap-1.5 transition-colors group ${post.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
+                          >
+                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: post.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
                             <span className="text-xs font-medium">{post.like_count}</span>
                           </button>
                           <div className="flex items-center gap-1.5 text-on-surface-variant">
@@ -154,7 +195,6 @@ export default function HomePage() {
                     <div key={`post-wrapper-${post.id}`} className="space-y-6">
                       {index === supportIndex && renderSupportCard()}
                       {postElement}
-                      {/* Special case: if support card is at the very end */}
                       {index === posts.length - 1 && supportIndex === posts.length && renderSupportCard()}
                     </div>
                   );
@@ -178,7 +218,6 @@ export default function HomePage() {
 
       <BottomNavBar />
 
-      {/* Floating Action Button for Create Post */}
       <button 
         onClick={() => navigate('/create')}
         className="fixed bottom-28 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-40 md:hidden"
@@ -186,7 +225,6 @@ export default function HomePage() {
         <span className="material-symbols-outlined text-3xl">add</span>
       </button>
 
-      {/* Desktop Version FAB / Button */}
       <button 
         onClick={() => navigate('/create')}
         className="fixed bottom-10 right-10 hidden md:flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full shadow-xl hover:bg-primary-dim transition-all z-40 group"

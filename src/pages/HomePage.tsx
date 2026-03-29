@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar from '../components/BottomNavBar';
+import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
 
 interface Post {
@@ -20,6 +21,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -47,12 +49,11 @@ export default function HomePage() {
     e.stopPropagation(); // Prevent navigating to detail page
 
     const userData = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     const user = userData ? JSON.parse(userData) : null;
 
     if (!user || !token) {
-      alert('좋아요를 누르려면 로그인이 필요합니다.');
-      navigate('/login');
+      setShowLoginAlert(true);
       return;
     }
 
@@ -232,6 +233,14 @@ export default function HomePage() {
         <span className="material-symbols-outlined group-hover:rotate-90 transition-transform">add</span>
         <span className="font-headline font-bold">새 글 작성</span>
       </button>
+
+      <AlertModal
+        isOpen={showLoginAlert}
+        title="로그인 필요"
+        message="좋아요를 누르려면 로그인이 필요합니다."
+        onConfirm={() => navigate('/login')}
+        confirmText="로그인하러 가기"
+      />
     </div>
   );
 }

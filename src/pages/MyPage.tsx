@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNavBar from '../components/BottomNavBar';
+import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
 
 export default function MyPage() {
@@ -13,6 +14,22 @@ export default function MyPage() {
       setUser(JSON.parse(userData));
     }
   }, []);
+
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: onConfirm || (() => setAlertConfig(prev => ({ ...prev, isOpen: false })))
+    });
+  };
 
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
@@ -31,8 +48,7 @@ export default function MyPage() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('token');
-    alert('로그아웃 되었습니다.');
-    navigate('/login');
+    showAlert('로그아웃', '로그아웃 되었습니다.', () => navigate('/login'));
   };
 
   const handleRefreshAvatar = async () => {
@@ -53,7 +69,7 @@ export default function MyPage() {
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
       } else {
-        alert('아바타 변경에 실패했습니다.');
+        showAlert('오류', '아바타 변경에 실패했습니다.');
       }
     } catch (err) {
       console.error('Refresh Avatar Error:', err);
@@ -250,6 +266,16 @@ export default function MyPage() {
 
       {/* BottomNavBar Component */}
       <BottomNavBar />
+
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onConfirm={() => {
+          alertConfig.onConfirm();
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }

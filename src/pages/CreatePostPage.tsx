@@ -18,7 +18,21 @@ export default function CreatePostPage() {
   const [content, setContent] = useState('');
   const [isCounselingRequested, setIsCounselingRequested] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: onConfirm || (() => setAlertConfig(prev => ({ ...prev, isOpen: false })))
+    });
+  };
 
   // 1. 카테고리 목록 불러오기
   useEffect(() => {
@@ -28,12 +42,12 @@ export default function CreatePostPage() {
         setCategories(data);
         if (data.length > 0) setSelectedCategoryId(data[0].id);
       })
-      .catch(() => alert('카테고리를 불러오는데 실패했습니다.'));
+      .catch(() => showAlert('오류', '카테고리를 불러오는데 실패했습니다.'));
   }, []);
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim() || !selectedCategoryId) {
-      alert('제목, 본문 및 카테고리를 모두 선택해 주세요.');
+      showAlert('입력 확인', '제목, 본문 및 카테고리를 모두 선택해 주세요.');
       return;
     }
 
@@ -50,13 +64,13 @@ export default function CreatePostPage() {
       });
 
       if (res.ok) {
-        setShowSuccessModal(true);
+        showAlert('게시 완료', '당신의 소중한 마음이 잘 전달되었습니다.', () => navigate('/', { replace: true }));
       } else {
         const data = await res.json();
-        alert(data.message || '저장에 실패했습니다.');
+        showAlert('오류', data.message || '저장에 실패했습니다.');
       }
     } catch (err) {
-      alert('서버와 통신 중 오류가 발생했습니다.');
+      showAlert('오류', '서버와 통신 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -155,11 +169,13 @@ export default function CreatePostPage() {
       </main>
 
       <AlertModal
-        isOpen={showSuccessModal}
-        title="게시 완료"
-        message="당신의 소중한 마음이 잘 전달되었습니다."
-        onConfirm={() => navigate('/', { replace: true })}
-        confirmText="메인으로"
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onConfirm={() => {
+          alertConfig.onConfirm();
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+        }}
       />
 
       <BottomNavBar />

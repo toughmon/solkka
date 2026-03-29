@@ -9,6 +9,21 @@ export default function VerifyPage() {
   const [errorMSG, setErrorMSG] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [generatedNickname, setGeneratedNickname] = useState('');
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: onConfirm || (() => setAlertConfig(prev => ({ ...prev, isOpen: false })))
+    });
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,7 +85,7 @@ export default function VerifyPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('가입하신 이메일로 코드를 새롭게 재전송했습니다.');
+        showAlert('전송 완료', '가입하신 이메일로 코드를 새롭게 재전송했습니다.');
       } else {
         setErrorMSG(data.message || '재전송 실패');
       }
@@ -229,6 +244,15 @@ export default function VerifyPage() {
         title="Welcome to Solkka"
         message={`회원가입이 완료되었습니다.\n익명 닉네임: ${generatedNickname}`}
         onConfirm={() => navigate('/', { replace: true })}
+      />
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onConfirm={() => {
+          alertConfig.onConfirm();
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+        }}
       />
     </div>
   );

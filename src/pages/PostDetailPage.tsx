@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import BottomNavBar from '../components/BottomNavBar';
+import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
 
 interface Post {
@@ -38,6 +39,21 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const showAlert = (title: string, message: string, onConfirm?: () => void) => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: onConfirm || (() => setAlertConfig(prev => ({ ...prev, isOpen: false })))
+    });
+  };
 
   useEffect(() => {
     if (id) {
@@ -57,8 +73,7 @@ export default function PostDetailPage() {
         const data = await res.json();
         setPost(data);
       } else {
-        alert('게시글을 찾을 수 없습니다.');
-        navigate('/');
+        showAlert('오류', '게시글을 찾을 수 없습니다.', () => navigate('/'));
       }
     } catch (err) {
       console.error('Fetch Post Detail Error:', err);
@@ -85,12 +100,11 @@ export default function PostDetailPage() {
 
   const handleLikePost = async () => {
     const userData = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     const user = userData ? JSON.parse(userData) : null;
 
     if (!user || !token) {
-      alert('좋아요를 누르려면 로그인이 필요합니다.');
-      navigate('/login');
+      showAlert('로그인 필요', '좋아요를 누르려면 로그인이 필요합니다.', () => navigate('/login'));
       return;
     }
 
@@ -114,12 +128,11 @@ export default function PostDetailPage() {
 
   const handleLikeComment = async (commentId: number) => {
     const userData = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     const user = userData ? JSON.parse(userData) : null;
 
     if (!user || !token) {
-      alert('좋아요를 누르려면 로그인이 필요합니다.');
-      navigate('/login');
+      showAlert('로그인 필요', '좋아요를 누르려면 로그인이 필요합니다.', () => navigate('/login'));
       return;
     }
 
@@ -150,11 +163,11 @@ export default function PostDetailPage() {
     if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
 
     const userData = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     const user = userData ? JSON.parse(userData) : null;
 
     if (!user || !token) {
-      alert('로그인이 필요합니다.');
+      showAlert('로그인 필요', '로그인이 필요합니다.');
       return;
     }
 
@@ -167,7 +180,7 @@ export default function PostDetailPage() {
         fetchComments();
       } else {
         const data = await res.json();
-        alert(data.message || '삭제에 실패했습니다.');
+        showAlert('오류', data.message || '삭제에 실패했습니다.');
       }
     } catch (err) {
       console.error('Delete Comment Error:', err);
@@ -179,8 +192,7 @@ export default function PostDetailPage() {
 
 
     if (!localStorage.getItem('accessToken')) {
-      alert('댓글을 남기려면 로그인이 필요합니다.');
-      navigate('/login');
+      showAlert('로그인 필요', '댓글을 남기려면 로그인이 필요합니다.', () => navigate('/login'));
       return;
     }
 
@@ -198,7 +210,7 @@ export default function PostDetailPage() {
         setReplyTo(null);
         fetchComments();
       } else {
-        alert('댓글 등록에 실패했습니다.');
+        showAlert('오류', '댓글 등록에 실패했습니다.');
       }
     } catch (err) {
       console.error('Send Comment Error:', err);
@@ -368,6 +380,16 @@ export default function PostDetailPage() {
         </div>
       </main>
       <BottomNavBar />
+
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onConfirm={() => {
+          alertConfig.onConfirm();
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 }

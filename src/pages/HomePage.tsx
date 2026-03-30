@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNavBar from '../components/BottomNavBar';
@@ -22,6 +22,10 @@ export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
+
+  const supportIndex = useMemo(() => {
+    return posts.length > 0 ? Math.floor(Math.random() * posts.length) : -1;
+  }, [posts.length > 0]);
 
   useEffect(() => {
     fetchPosts();
@@ -144,63 +148,59 @@ export default function HomePage() {
             </div>
           ) : posts.length > 0 ? (
             <>
-              {(() => {
-                const supportIndex = Math.floor(Math.random() * (posts.length)) || (posts.length > 0 ? 0 : -1);
-
-                return posts.map((post, index) => {
-                  const postElement = (
-                    <article
-                      key={post.id}
-                      onClick={() => navigate(`/post/${post.id}`)}
-                      className="bg-surface-container-lowest p-6 rounded-xl space-y-4 transition-all hover:translate-y-[-2px] hover:shadow-md border border-outline-variant/5 cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start">
-                        <span className="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase">
-                          {post.category_name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {post.is_counseling_requested && (
-                            <span className="material-symbols-outlined text-primary text-sm" title="상담 요청됨">psychology</span>
-                          )}
-                          <span className="text-xs text-outline font-medium">{getTimeAgo(post.created_at)}</span>
-                        </div>
+              {posts.map((post, index) => {
+                const postElement = (
+                  <article
+                    key={post.id}
+                    onClick={() => navigate(`/post/${post.id}`)}
+                    className="bg-surface-container-lowest p-6 rounded-xl space-y-4 transition-all hover:translate-y-[-2px] hover:shadow-md border border-outline-variant/5 cursor-pointer"
+                  >
+                    <div className="flex justify-between items-start">
+                      <span className="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase">
+                        {post.category_name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {post.is_counseling_requested && (
+                          <span className="material-symbols-outlined text-primary text-sm" title="상담 요청됨">psychology</span>
+                        )}
+                        <span className="text-xs text-outline font-medium">{getTimeAgo(post.created_at)}</span>
                       </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-headline font-semibold text-on-surface leading-snug">{post.title}</h3>
-                        <p className="text-on-surface-variant text-sm leading-relaxed line-clamp-3">
-                          {post.content}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-6">
-                          <button
-                            onClick={(e) => handleLikePost(e, post.id)}
-                            className={`flex items-center gap-1.5 transition-colors group ${post.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
-                          >
-                            <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: post.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-                            <span className="text-xs font-medium">{post.like_count}</span>
-                          </button>
-                          <div className="flex items-center gap-1.5 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-lg">visibility</span>
-                            <span className="text-xs font-medium">{post.view_count}</span>
-                          </div>
-                        </div>
-                        <button className="p-2 text-outline-variant hover:text-primary transition-colors">
-                          <span className="material-symbols-outlined text-lg">bookmark</span>
-                        </button>
-                      </div>
-                    </article>
-                  );
-
-                  return (
-                    <div key={`post-wrapper-${post.id}`} className="space-y-6">
-                      {index === supportIndex && renderSupportCard()}
-                      {postElement}
-                      {index === posts.length - 1 && supportIndex === posts.length && renderSupportCard()}
                     </div>
-                  );
-                });
-              })()}
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-headline font-semibold text-on-surface leading-snug">{post.title}</h3>
+                      <p className="text-on-surface-variant text-sm leading-relaxed line-clamp-3">
+                        {post.content}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center gap-6">
+                        <button
+                          onClick={(e) => handleLikePost(e, post.id)}
+                          className={`flex items-center gap-1.5 transition-colors group ${post.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
+                        >
+                          <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: post.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+                          <span className="text-xs font-medium">{post.like_count}</span>
+                        </button>
+                        <div className="flex items-center gap-1.5 text-on-surface-variant">
+                          <span className="material-symbols-outlined text-lg">visibility</span>
+                          <span className="text-xs font-medium">{post.view_count}</span>
+                        </div>
+                      </div>
+                      <button className="p-2 text-outline-variant hover:text-primary transition-colors">
+                        <span className="material-symbols-outlined text-lg">bookmark</span>
+                      </button>
+                    </div>
+                  </article>
+                );
+
+                return (
+                  <div key={`post-wrapper-${post.id}`} className="space-y-6">
+                    {index === supportIndex && renderSupportCard()}
+                    {postElement}
+                    {index === posts.length - 1 && supportIndex === posts.length && renderSupportCard()}
+                  </div>
+                );
+              })}
             </>
           ) : (
             <div className="text-center py-20 bg-surface-container-lowest rounded-xl">

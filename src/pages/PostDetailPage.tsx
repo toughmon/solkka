@@ -21,6 +21,7 @@ interface Post {
 interface Comment {
   id: number;
   post_id: number;
+  user_account_id: number | null;
   parent_comment_id: number | null;
   content: string;
   author_nickname?: string;
@@ -257,30 +258,53 @@ export default function PostDetailPage() {
         {comment.is_deleted ? '삭제된 댓글입니다.' : comment.content}
       </p>
       {!comment.is_deleted && (
-        <div className="flex items-center gap-4 pt-1">
-          <button
-            onClick={() => handleLikeComment(comment.id)}
-            className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
-          >
-            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
-            <span className="text-[10px] font-bold">{comment.like_count}</span>
-          </button>
-          <button
-            onClick={() => setReplyTo(comment)}
-            className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-xs">reply</span>
-            답글 달기
-          </button>
+        <div className="space-y-2">
+          <div className="flex items-center gap-4 pt-1">
+            <button
+              onClick={() => handleLikeComment(comment.id)}
+              className={`flex items-center gap-1.5 transition-colors group ${comment.is_liked ? 'text-error' : 'text-on-surface-variant hover:text-primary'}`}
+            >
+              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: comment.is_liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
+              <span className="text-[10px] font-bold">{comment.like_count}</span>
+            </button>
+            <button
+              onClick={() => setReplyTo(comment)}
+              className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-xs">reply</span>
+              답글 달기
+            </button>
+            {(() => {
+              const userData = localStorage.getItem('user');
+              const user = userData ? JSON.parse(userData) : null;
+              return user && comment.author_nickname === user.nickname && (
+                <button
+                  onClick={() => handleDeleteComment(comment.id)}
+                  className="text-[10px] font-bold text-error/60 hover:text-error hover:underline ml-auto"
+                >
+                  삭제
+                </button>
+              );
+            })()}
+          </div>
+          {/* 상담요청 버튼: is_counseling_requested 게시물 + 타인의 댓글인 경우에만 */}
           {(() => {
+            if (!post?.is_counseling_requested) return null;
             const userData = localStorage.getItem('user');
-            const user = userData ? JSON.parse(userData) : null;
-            return user && comment.author_nickname === user.nickname && (
+            const currentUser = userData ? JSON.parse(userData) : null;
+            if (!currentUser || comment.user_account_id === currentUser.id) return null;
+            return (
               <button
-                onClick={() => handleDeleteComment(comment.id)}
-                className="text-[10px] font-bold text-error/60 hover:text-error hover:underline ml-auto"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
+                  bg-gradient-to-r from-[#5b8fa8] to-[#4c6272]
+                  text-white text-xs font-bold tracking-wide
+                  shadow-md shadow-[#4c6272]/20
+                  hover:shadow-lg hover:shadow-[#4c6272]/30 hover:brightness-110
+                  active:scale-[0.98]
+                  transition-all duration-200 ease-out"
               >
-                삭제
+                <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
+                {comment.author_nickname || '익명'}님에게 상담 요청
               </button>
             );
           })()}

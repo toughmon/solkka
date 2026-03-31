@@ -56,6 +56,37 @@ export default function PostDetailPage() {
     });
   };
 
+  const handleCounselingRequest = async (comment: Comment) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      showAlert('로그인 필요', '상담을 요청하려면 로그인이 필요합니다.', () => navigate('/login'));
+      return;
+    }
+
+    try {
+      const res = await authFetch('/api/counseling-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          post_id: parseInt(id!),
+          responder_id: comment.user_account_id,
+          comment_id: comment.id
+        })
+      });
+
+      if (res.ok) {
+        showAlert('전송 완료', `${comment.author_nickname || '익명'}님에게 상담 요청을 보냈습니다.`);
+      } else if (res.status === 409) {
+        showAlert('알림', '이미 진행 중인 상담 요청이 있습니다.');
+      } else {
+        const data = await res.json();
+        showAlert('오류', data.message || '상담 요청에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('Counseling Request Error:', err);
+      showAlert('오류', '상담 요청 중 문제가 발생했습니다.');
+    }
+  };
+
   useEffect(() => {
     if (id) {
       fetchPostDetail();
@@ -295,6 +326,7 @@ export default function PostDetailPage() {
             if (!currentUser || comment.user_account_id === currentUser.id) return null;
             return (
               <button
+                onClick={() => handleCounselingRequest(comment)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl
                   bg-gradient-to-r from-[#5b8fa8] to-[#4c6272]
                   text-white text-xs font-bold tracking-wide

@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
@@ -629,8 +631,445 @@ app.delete('/api/comments/:id', authenticateToken, async (req, res) => {
   }
 });
 
+/* ================================
+   상담 요청(Counseling Request) API
+================================ */
+
+// 11. 상담 요청 생성
+app.post('/api/counseling-requests', authenticateToken, async (req, res) => {
+  const { post_id, responder_id, comment_id } = req.body;
+  const requester_id = req.user.id;
+
+  if (!post_id || !responder_id) {
+    return res.status(400).json({ message: '게시글 ID와 응답자 ID가 필요합니다.' });
+  }
+
+  if (requester_id === responder_id) {
+    return res.status(400).json({ message: '자기 자신에게는 상담 요청을 보낼 수 없습니다.' });
+  }
+
+  try {
+    // 중복 요청 확인 (pending 또는 accepted 상태)
+    const existing = await pool.query(
+      `SELECT id FROM solkka.counseling_request 
+       WHERE post_id = $1 AND requester_id = $2 AND responder_id = $3 
+       AND status IN ('pending', 'accepted')`,
+      [post_id, requester_id, responder_id]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ message: '이미 진행 중인 상담 요청이 있습니다.' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO solkka.counseling_request (post_id, requester_id, responder_id, comment_id) 
+       VALUES ($1, $2, $3, $4) RETURNING id, status`,
+      [post_id, requester_id, responder_id, comment_id || null]
+    );
+
+    // Socket.IO로 실시간 알림
+    io.to(`user_${responder_id}`).emit('new_request', {
+      requestId: result.rows[0].id,
+      requesterId: requester_id
+    });
+
+    res.json({ success: true, message: '상담 요청이 전송되었습니다.', request: result.rows[0] });
+  } catch (error) {
+    console.error('Create Counseling Request Error:', error);
+    res.status(500).json({ message: '상담 요청 중 오류가 발생했습니다.' });
+  }
+});
+
+// 12. 내가 받은 상담 요청 목록
+app.get('/api/counseling-requests/received', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT cr.*, 
+        u.nickname as requester_nickname, u.avatar_url as requester_avatar_url,
+        p.title as post_title
+      FROM solkka.counseling_request cr
+      JOIN solkka.user_account u ON cr.requester_id = u.id
+      JOIN solkka.post p ON cr.post_id = p.id
+      WHERE cr.responder_id = $1
+      ORDER BY cr.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Received Requests Error:', error);
+    res.status(500).json({ message: '요청 목록을 가져오지 못했습니다.' });
+  }
+});
+
+// 13. 내가 보낸 상담 요청 목록
+app.get('/api/counseling-requests/sent', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT cr.*, 
+        u.nickname as responder_nickname, u.avatar_url as responder_avatar_url,
+        p.title as post_title
+      FROM solkka.counseling_request cr
+      JOIN solkka.user_account u ON cr.responder_id = u.id
+      JOIN solkka.post p ON cr.post_id = p.id
+      WHERE cr.requester_id = $1
+      ORDER BY cr.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Sent Requests Error:', error);
+    res.status(500).json({ message: '요청 목록을 가져오지 못했습니다.' });
+  }
+});
+
+// 14. 상담 요청 수락 → 채팅방 자동 생성
+app.patch('/api/counseling-requests/:id/accept', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 요청 확인 및 권한 체크
+    const reqResult = await client.query(
+      'SELECT * FROM solkka.counseling_request WHERE id = $1 AND responder_id = $2 AND status = $3',
+      [id, req.user.id, 'pending']
+    );
+
+    if (reqResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: '유효한 상담 요청을 찾을 수 없습니다.' });
+    }
+
+    const request = reqResult.rows[0];
+
+    // 상태 업데이트
+    await client.query(
+      'UPDATE solkka.counseling_request SET status = $1 WHERE id = $2',
+      ['accepted', id]
+    );
+
+    // 채팅방 생성
+    const roomResult = await client.query(
+      `INSERT INTO solkka.chat_room (counseling_request_id, user1_id, user2_id) 
+       VALUES ($1, $2, $3) RETURNING id`,
+      [id, request.requester_id, request.responder_id]
+    );
+
+    await client.query('COMMIT');
+
+    const roomId = roomResult.rows[0].id;
+
+    // 요청자에게 실시간 알림
+    io.to(`user_${request.requester_id}`).emit('request_accepted', {
+      requestId: parseInt(id),
+      roomId
+    });
+
+    res.json({ success: true, message: '상담 요청을 수락했습니다.', roomId });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Accept Counseling Request Error:', error);
+    res.status(500).json({ message: '요청 수락 중 오류가 발생했습니다.' });
+  } finally {
+    client.release();
+  }
+});
+
+// 15. 상담 요청 거절
+app.patch('/api/counseling-requests/:id/reject', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `UPDATE solkka.counseling_request SET status = 'rejected' 
+       WHERE id = $1 AND responder_id = $2 AND status = 'pending' RETURNING id`,
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: '유효한 상담 요청을 찾을 수 없습니다.' });
+    }
+
+    res.json({ success: true, message: '상담 요청을 거절했습니다.' });
+  } catch (error) {
+    console.error('Reject Counseling Request Error:', error);
+    res.status(500).json({ message: '요청 거절 중 오류가 발생했습니다.' });
+  }
+});
+
+/* ================================
+   채팅(Chat) API
+================================ */
+
+// 16. 내 채팅방 목록 조회 (최근 메시지 포함)
+app.get('/api/chat-rooms', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        cr.id,
+        cr.is_active,
+        cr.created_at,
+        CASE WHEN cr.user1_id = $1 THEN u2.id ELSE u1.id END as partner_id,
+        CASE WHEN cr.user1_id = $1 THEN u2.nickname ELSE u1.nickname END as partner_nickname,
+        CASE WHEN cr.user1_id = $1 THEN u2.avatar_url ELSE u1.avatar_url END as partner_avatar_url,
+        lm.content as last_message,
+        lm.created_at as last_message_at,
+        (SELECT COUNT(*) FROM solkka.chat_message WHERE chat_room_id = cr.id AND sender_id != $1 AND is_read = FALSE)::int as unread_count
+      FROM solkka.chat_room cr
+      JOIN solkka.user_account u1 ON cr.user1_id = u1.id
+      JOIN solkka.user_account u2 ON cr.user2_id = u2.id
+      LEFT JOIN LATERAL (
+        SELECT content, created_at FROM solkka.chat_message 
+        WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1
+      ) lm ON TRUE
+      WHERE (cr.user1_id = $1 OR cr.user2_id = $1) AND cr.is_active = TRUE
+      ORDER BY COALESCE(lm.created_at, cr.created_at) DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fetch Chat Rooms Error:', error);
+    res.status(500).json({ message: '채팅방 목록을 가져오지 못했습니다.' });
+  }
+});
+
+// 17. 특정 채팅방 메시지 조회 (페이지네이션)
+app.get('/api/chat-rooms/:id/messages', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { cursor, limit = 30 } = req.query;
+
+  try {
+    // 채팅방 참여자 확인
+    const roomCheck = await pool.query(
+      'SELECT id FROM solkka.chat_room WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)',
+      [id, req.user.id]
+    );
+
+    if (roomCheck.rows.length === 0) {
+      return res.status(403).json({ message: '채팅방에 접근할 수 없습니다.' });
+    }
+
+    let query, params;
+    if (cursor) {
+      query = `
+        SELECT cm.*, u.nickname as sender_nickname, u.avatar_url as sender_avatar_url
+        FROM solkka.chat_message cm
+        LEFT JOIN solkka.user_account u ON cm.sender_id = u.id
+        WHERE cm.chat_room_id = $1 AND cm.created_at < $2
+        ORDER BY cm.created_at DESC LIMIT $3
+      `;
+      params = [id, cursor, parseInt(limit)];
+    } else {
+      query = `
+        SELECT cm.*, u.nickname as sender_nickname, u.avatar_url as sender_avatar_url
+        FROM solkka.chat_message cm
+        LEFT JOIN solkka.user_account u ON cm.sender_id = u.id
+        WHERE cm.chat_room_id = $1
+        ORDER BY cm.created_at DESC LIMIT $2
+      `;
+      params = [id, parseInt(limit)];
+    }
+
+    const result = await pool.query(query, params);
+
+    // 읽음 처리 (상대방의 메시지를 모두 읽음 표시)
+    await pool.query(
+      `UPDATE solkka.chat_message SET is_read = TRUE 
+       WHERE chat_room_id = $1 AND sender_id != $2 AND is_read = FALSE`,
+      [id, req.user.id]
+    );
+
+    res.json(result.rows.reverse());
+  } catch (error) {
+    console.error('Fetch Messages Error:', error);
+    res.status(500).json({ message: '메시지를 가져오지 못했습니다.' });
+  }
+});
+
+// 18. 메시지 전송 (REST API)
+app.post('/api/chat-rooms/:id/messages', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { content } = req.body;
+
+  if (!content || !content.trim()) {
+    return res.status(400).json({ message: '메시지 내용을 입력해주세요.' });
+  }
+
+  try {
+    // 채팅방 참여자 확인
+    const roomCheck = await pool.query(
+      'SELECT user1_id, user2_id FROM solkka.chat_room WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)',
+      [id, req.user.id]
+    );
+
+    if (roomCheck.rows.length === 0) {
+      return res.status(403).json({ message: '채팅방에 접근할 수 없습니다.' });
+    }
+
+    const room = roomCheck.rows[0];
+    const partnerId = room.user1_id === req.user.id ? room.user2_id : room.user1_id;
+
+    // 메시지 DB 저장
+    const result = await pool.query(
+      `INSERT INTO solkka.chat_message (chat_room_id, sender_id, content) 
+       VALUES ($1, $2, $3) 
+       RETURNING id, chat_room_id, sender_id, content, is_read, created_at`,
+      [id, req.user.id, content.trim()]
+    );
+
+    // 발신자 닉네임 조회
+    const userResult = await pool.query(
+      'SELECT nickname, avatar_url FROM solkka.user_account WHERE id = $1',
+      [req.user.id]
+    );
+
+    const message = {
+      ...result.rows[0],
+      sender_nickname: userResult.rows[0]?.nickname,
+      sender_avatar_url: userResult.rows[0]?.avatar_url
+    };
+
+    // Socket.IO로 실시간 브로드캐스트
+    io.to(`room_${id}`).emit('new_message', message);
+    io.to(`user_${partnerId}`).emit('chat_notification', {
+      roomId: parseInt(id),
+      message
+    });
+
+    res.json({ success: true, message: message });
+  } catch (error) {
+    console.error('Send Message Error:', error);
+    res.status(500).json({ message: '메시지 전송에 실패했습니다.' });
+  }
+});
+
+/* ================================
+   Socket.IO 실시간 통신
+================================ */
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: '*' }
+});
+
+// Socket.IO 인증 미들웨어
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) {
+    console.error(`Socket Auth Error: No token provided for socket ${socket.id}`);
+    return next(new Error('인증 토큰이 필요합니다.'));
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.error(`Socket Auth Error: Invalid token for socket ${socket.id}`, err.message);
+      return next(new Error('유효하지 않은 토큰입니다.'));
+    }
+    socket.user = user;
+    next();
+  });
+});
+
+io.on('connection', (socket) => {
+  console.log(`🔌 Socket connected: user ${socket.user.id}`);
+
+  // 개인 알림 채널 자동 참가
+  socket.join(`user_${socket.user.id}`);
+
+  // 채팅방 입장
+  socket.on('join_room', async (roomId) => {
+    try {
+      const check = await pool.query(
+        'SELECT id FROM solkka.chat_room WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)',
+        [roomId, socket.user.id]
+      );
+      if (check.rows.length > 0) {
+        socket.join(`room_${roomId}`);
+        console.log(`User ${socket.user.id} joined room_${roomId}`);
+      }
+    } catch (err) {
+      console.error('Join Room Error:', err);
+    }
+  });
+
+  // 채팅방 퇴장
+  socket.on('leave_room', (roomId) => {
+    socket.leave(`room_${roomId}`);
+  });
+
+  // 메시지 전송
+  socket.on('send_message', async ({ roomId, content }) => {
+    console.log(`📨 send_message received from user ${socket.user.id}: roomId=${roomId}, content="${content?.substring(0, 20)}"`);
+    if (!content || !content.trim()) return;
+
+    try {
+      // 채팅방 참여자 확인
+      const roomCheck = await pool.query(
+        'SELECT user1_id, user2_id FROM solkka.chat_room WHERE id = $1 AND (user1_id = $2 OR user2_id = $2)',
+        [roomId, socket.user.id]
+      );
+
+      console.log(`📨 roomCheck result: ${roomCheck.rows.length} rows, user=${socket.user.id}, roomId=${roomId}`);
+      if (roomCheck.rows.length === 0) {
+        console.log(`❌ Room check failed for user ${socket.user.id} in room ${roomId}`);
+        return;
+      }
+
+      const room = roomCheck.rows[0];
+      const partnerId = room.user1_id === socket.user.id ? room.user2_id : room.user1_id;
+
+      // 메시지 DB 저장
+      const result = await pool.query(
+        `INSERT INTO solkka.chat_message (chat_room_id, sender_id, content) 
+         VALUES ($1, $2, $3) 
+         RETURNING id, chat_room_id, sender_id, content, is_read, created_at`,
+        [roomId, socket.user.id, content.trim()]
+      );
+
+      // 발신자 닉네임 조회
+      const userResult = await pool.query(
+        'SELECT nickname, avatar_url FROM solkka.user_account WHERE id = $1',
+        [socket.user.id]
+      );
+
+      const message = {
+        ...result.rows[0],
+        sender_nickname: userResult.rows[0]?.nickname,
+        sender_avatar_url: userResult.rows[0]?.avatar_url
+      };
+
+      // 채팅방 내 모든 참가자에게 전송
+      io.to(`room_${roomId}`).emit('new_message', message);
+
+      // 상대방이 채팅방에 없는 경우 개인 채널로도 알림
+      io.to(`user_${partnerId}`).emit('chat_notification', {
+        roomId: parseInt(roomId),
+        message
+      });
+    } catch (err) {
+      console.error('Send Message Error:', err);
+    }
+  });
+
+  // 메시지 읽음 처리
+  socket.on('message_read', async (roomId) => {
+    try {
+      await pool.query(
+        `UPDATE solkka.chat_message SET is_read = TRUE 
+         WHERE chat_room_id = $1 AND sender_id != $2 AND is_read = FALSE`,
+        [roomId, socket.user.id]
+      );
+      socket.to(`room_${roomId}`).emit('messages_read', { roomId, readBy: socket.user.id });
+    } catch (err) {
+      console.error('Message Read Error:', err);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 Socket disconnected: user ${socket.user.id}`);
+  });
+});
+
 // 서버 구동
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 Solkka Backend is running on http://localhost:${PORT}`);
 });

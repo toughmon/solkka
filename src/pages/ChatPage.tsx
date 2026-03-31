@@ -1,116 +1,245 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import BottomNavBar from '../components/BottomNavBar';
+import { authFetch } from '../utils/api';
+
+interface ChatRoom {
+  id: number;
+  partner_id: number;
+  partner_nickname: string;
+  partner_avatar_url: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+  is_active: boolean;
+}
+
+interface CounselingRequest {
+  id: number;
+  post_id: number;
+  post_title: string;
+  requester_id: number;
+  requester_nickname: string;
+  requester_avatar_url: string;
+  status: string;
+  created_at: string;
+}
+
 export default function ChatPage() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'chats' | 'requests'>('chats');
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [requests, setRequests] = useState<CounselingRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [roomsRes, reqsRes] = await Promise.all([
+        authFetch('/api/chat-rooms'),
+        authFetch('/api/counseling-requests/received')
+      ]);
+      if (roomsRes.ok) setChatRooms(await roomsRes.json());
+      if (reqsRes.ok) setRequests(await reqsRes.json());
+    } catch (err) {
+      console.error('Fetch Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccept = async (requestId: number) => {
+    try {
+      const res = await authFetch(`/api/counseling-requests/${requestId}/accept`, {
+        method: 'PATCH'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchData();
+        navigate(`/chat/${data.roomId}`);
+      }
+    } catch (err) {
+      console.error('Accept Error:', err);
+    }
+  };
+
+  const handleReject = async (requestId: number) => {
+    if (!window.confirm('상담 요청을 거절하시겠습니까?')) return;
+    try {
+      const res = await authFetch(`/api/counseling-requests/${requestId}/reject`, {
+        method: 'PATCH'
+      });
+      if (res.ok) fetchData();
+    } catch (err) {
+      console.error('Reject Error:', err);
+    }
+  };
+
+  const getTimeAgo = (dateStr: string | null) => {
+    if (!dateStr) return '';
+    const now = new Date();
+    const past = new Date(dateStr);
+    const diffInMs = now.getTime() - past.getTime();
+    const diffInMins = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    if (diffInMins < 1) return '방금';
+    if (diffInMins < 60) return `${diffInMins}분 전`;
+    if (diffInHours < 24) return `${diffInHours}시간 전`;
+    return `${diffInDays}일 전`;
+  };
+
+  const pendingRequests = requests.filter(r => r.status === 'pending');
+
   return (
-    <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col relative w-full overflow-hidden">
-      
-      {/* TopAppBar */}
-      <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-xl border-b border-surface-container-low flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => window.history.back()}
-            className="flex items-center justify-center p-2 -ml-2 rounded-full hover:bg-surface-container transition-all duration-300 active:scale-95 text-primary"
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
-          
-          <div className="relative">
-            <img 
-              alt="사라 (상담사)" 
-              className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/10" 
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBykrLzHyyKfGKPCzsGj8NZ-5DlAeY00ZPAclJ6DfrulAeUe66TdkmyTXncQ35MVxMDYe8h217Spy-RodSC-LIt58MS18cwWI4VN8IeJ8KjQtKKjHc5hM94dcwHETWxAED6RrLTSLT1TO9T7DwxLHRXFlXwfDvflYh_TnPTmRzcVweNoxK3CJ8CiS0Eqy246LVRKHnnByj_s36wiLF4LlqH0hrJEwY7lJsWMJkyh87sWgoZ6jfDVHrhtsdj7s5zZ01s4UvO8kbRZIA" 
-            />
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-tertiary border-2 border-surface rounded-full"></span>
-          </div>
-          
-          <div>
-            <h1 className="font-headline font-bold text-lg tracking-tight text-primary">사라 (상담사)</h1>
-            <p className="text-[10px] font-label uppercase tracking-widest font-bold text-gray-500">현재 접속 중</p>
-          </div>
+    <div className="bg-surface font-body text-on-surface antialiased min-h-screen pb-24">
+      {/* Header */}
+      <header className="fixed top-0 w-full flex items-center px-6 h-16 bg-[#fbf9f8]/80 backdrop-blur-xl z-50 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>chat</span>
+          <h1 className="text-lg font-headline font-bold tracking-tight text-primary">대화</h1>
         </div>
-        
-        <button className="p-2 -mr-2 rounded-full hover:bg-surface-container transition-colors duration-300">
-          <span className="material-symbols-outlined text-primary">more_vert</span>
-        </button>
       </header>
 
-      {/* Main Content Canvas */}
-      <main className="pt-24 pb-[130px] px-4 max-w-2xl mx-auto w-full flex-1 flex flex-col relative z-10">
-        
-        {/* Secure Banner */}
-        <div className="flex justify-center mb-8 shrink-0">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full border border-gray-200">
-            <span className="material-symbols-outlined text-[14px] text-gray-400">lock</span>
-            <span className="text-[11px] font-label text-gray-500 font-bold uppercase tracking-wider">종단간 암호화가 적용된 대화방</span>
-          </div>
-        </div>
-
-        {/* Scrollable Chat Area */}
-        <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 flex flex-col pb-4">
-          
-          {/* Counselor Message */}
-          <div className="flex flex-col items-start max-w-[85%] animate-fade-in">
-            <div className="bg-white border border-gray-100 text-gray-800 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl px-5 py-4 shadow-[0_2px_10px_rgb(0,0,0,0.02)]">
-              <p className="text-sm leading-relaxed">
-                안녕하세요. 어제 정적 속에서 벅참을 느꼈다고 말씀하신 부분을 계속 생각하고 있었어요. 그런 감정과 마주 앉는 데는 큰 용기가 필요하죠. 지금 이 순간, 마음 상태는 어떠신가요?
-              </p>
-            </div>
-            <span className="mt-2 ml-2 text-[10px] font-label text-gray-400 uppercase tracking-tighter font-bold">오전 10:14</span>
-          </div>
-
-          {/* User Message */}
-          <div className="flex flex-col items-end max-w-[85%] self-end">
-            <div className="bg-primary text-white rounded-tl-2xl rounded-bl-2xl rounded-br-2xl px-5 py-4 shadow-md">
-              <p className="text-sm leading-relaxed">
-                오늘은 조금 편안해졌어요. 저희가 이야기했던 호흡법을 해봤거든요. 불안감이 완전히 사라진 건 아니지만, 폭풍 속에서 작은 닻을 내린 기분이었어요.
-              </p>
-            </div>
-            <span className="mt-2 mr-2 text-[10px] font-label text-gray-400 uppercase tracking-tighter font-bold">오전 10:16</span>
-          </div>
-
-          {/* Counselor Message */}
-          <div className="flex flex-col items-start max-w-[85%]">
-            <div className="bg-white border border-gray-100 text-gray-800 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl px-5 py-4 shadow-[0_2px_10px_rgb(0,0,0,0.02)]">
-              <p className="text-sm leading-relaxed">
-                그 작은 닻이 바로 우리의 시작점이 될 거예요. 모든 걸 '고치려고' 재촉할 필요는 없습니다. 그저 함께 물결을 헤쳐 나가는 법을 배우고 있는 거니까요. 닻을 내린 듯한 그 느낌에 대해 좀 더 이야기해볼까요, 아니면 오늘 특별히 마음을 무겁게 하는 다른 일이 있나요?
-              </p>
-            </div>
-            <div className="flex items-center gap-2 mt-2 ml-2">
-              <span className="text-[10px] font-label text-gray-400 uppercase tracking-tighter font-bold">오전 10:18</span>
-              <div className="w-1.5 h-1.5 bg-[#4c6272] opacity-40 rounded-full animate-pulse"></div>
-            </div>
-          </div>
-
-        </div>
-      </main>
-
-      {/* Bottom Message Input Area */}
-      <div className="fixed bottom-0 left-0 w-full bg-surface/90 backdrop-blur-xl border-t border-gray-200 px-4 pb-8 pt-3 z-50">
-        <div className="max-w-2xl mx-auto flex items-end gap-2 md:gap-3">
-          
-          {/* Utility Actions */}
-          <div className="flex items-center gap-1 mb-1">
-            <button className="p-2 text-primary hover:bg-gray-100 rounded-full transition-all">
-              <span className="material-symbols-outlined">add_circle</span>
-            </button>
-            <button className="p-2 text-primary hover:bg-gray-100 rounded-full transition-all">
-              <span className="material-symbols-outlined">mic</span>
-            </button>
-          </div>
-          
-          {/* Input Field */}
-          <div className="flex-1 bg-white border border-gray-200 shadow-sm rounded-2xl flex items-center px-4 py-2 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
-            <textarea 
-              className="w-full bg-transparent border-none focus:ring-0 text-sm py-2 placeholder:text-gray-400 resize-none outline-none text-gray-800 h-[24px] overflow-hidden" 
-              placeholder="당신의 생각을 적어보세요..." 
-              rows={1}
-            ></textarea>
-          </div>
-          
-          {/* Send Button */}
-          <button className="mb-0.5 w-[50px] h-[50px] shrink-0 rounded-2xl bg-primary hover:bg-[#3d4f5c] text-white flex items-center justify-center shadow-md active:scale-95 transition-all">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>send</span>
+      <main className="pt-20 px-4 max-w-2xl mx-auto">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setActiveTab('chats')}
+            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
+              activeTab === 'chats'
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+            }`}
+          >
+            채팅방 {chatRooms.length > 0 && <span className="ml-1 opacity-70">{chatRooms.length}</span>}
+          </button>
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all relative ${
+              activeTab === 'requests'
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+            }`}
+          >
+            받은 요청
+            {pendingRequests.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-error text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {pendingRequests.length}
+              </span>
+            )}
           </button>
         </div>
-      </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-pulse text-primary font-headline font-bold text-lg">불러오는 중...</div>
+          </div>
+        ) : activeTab === 'chats' ? (
+          /* Chat Rooms List */
+          <div className="space-y-3">
+            {chatRooms.length === 0 ? (
+              <div className="text-center py-16">
+                <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4 block">forum</span>
+                <p className="text-on-surface-variant/60 text-sm">아직 대화가 없습니다</p>
+                <p className="text-on-surface-variant/40 text-xs mt-1">게시글에서 상담을 요청해보세요</p>
+              </div>
+            ) : (
+              chatRooms.map(room => (
+                <button
+                  key={room.id}
+                  onClick={() => navigate(`/chat/${room.id}`)}
+                  className="w-full flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 hover:shadow-md hover:translate-y-[-1px] transition-all text-left"
+                >
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-primary-container">
+                      <img
+                        alt={room.partner_nickname}
+                        src={room.partner_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${room.partner_nickname}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {room.unread_count > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-error text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                        {room.unread_count > 9 ? '9+' : room.unread_count}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-sm text-on-surface truncate">{room.partner_nickname}</span>
+                      <span className="text-[10px] text-on-surface-variant/60 flex-shrink-0 ml-2">{getTimeAgo(room.last_message_at)}</span>
+                    </div>
+                    <p className={`text-xs truncate ${room.unread_count > 0 ? 'text-on-surface font-semibold' : 'text-on-surface-variant/60'}`}>
+                      {room.last_message || '대화를 시작해보세요 👋'}
+                    </p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        ) : (
+          /* Counseling Requests List */
+          <div className="space-y-3">
+            {pendingRequests.length === 0 ? (
+              <div className="text-center py-16">
+                <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4 block">mark_email_unread</span>
+                <p className="text-on-surface-variant/60 text-sm">받은 상담 요청이 없습니다</p>
+              </div>
+            ) : (
+              pendingRequests.map(req => (
+                <div
+                  key={req.id}
+                  className="p-5 bg-white rounded-2xl border border-gray-100 space-y-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-container flex-shrink-0">
+                      <img
+                        alt={req.requester_nickname}
+                        src={req.requester_avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${req.requester_nickname}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-on-surface">{req.requester_nickname}</p>
+                      <p className="text-[10px] text-on-surface-variant/60">{getTimeAgo(req.created_at)}</p>
+                    </div>
+                    <span className="material-symbols-outlined text-primary text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>support_agent</span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant bg-surface-container-low px-3 py-2 rounded-lg">
+                    <span className="font-bold text-primary">게시글:</span> {req.post_title}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleAccept(req.id)}
+                      className="flex-1 py-2.5 bg-gradient-to-r from-[#5b8fa8] to-[#4c6272] text-white text-xs font-bold rounded-xl shadow-md hover:brightness-110 active:scale-[0.98] transition-all"
+                    >
+                      수락하기
+                    </button>
+                    <button
+                      onClick={() => handleReject(req.id)}
+                      className="flex-1 py-2.5 bg-surface-container-low text-on-surface-variant text-xs font-bold rounded-xl hover:bg-surface-container active:scale-[0.98] transition-all"
+                    >
+                      거절하기
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </main>
+
+      <BottomNavBar />
     </div>
   );
 }

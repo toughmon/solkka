@@ -16,10 +16,10 @@ export default function BottomNavBar() {
         <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">홈</span>
       </Link>
       
-      {/* Posts */}
-      <Link className={isActive('/search') ? activeClass : inactiveClass} to="/search">
+      {/* 상담 */}
+      <Link className={isActive('/chat') ? activeClass : inactiveClass} to="/chat">
         <span className="material-symbols-outlined mb-1 shrink-0">chat_bubble</span>
-        <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">게시글</span>
+        <span className="font-['Manrope'] text-[11px] font-medium tracking-wide">상담</span>
       </Link>
 
       {/* Create Post */}

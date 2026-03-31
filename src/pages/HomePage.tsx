@@ -5,6 +5,11 @@ import BottomNavBar from '../components/BottomNavBar';
 import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
 
+interface Category {
+  id: number;
+  name: string;
+}
+
 interface Post {
   id: number;
   title: string;
@@ -20,6 +25,8 @@ interface Post {
 export default function HomePage() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<number | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [showLoginAlert, setShowLoginAlert] = useState(false);
 
@@ -28,16 +35,41 @@ export default function HomePage() {
   }, [posts.length > 0]);
 
   useEffect(() => {
-    fetchPosts();
+    fetchCategories();
   }, []);
 
+  useEffect(() => {
+    fetchPosts();
+  }, [selectedCategory]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await authFetch('/api/categories');
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+    }
+  };
+
   const fetchPosts = async () => {
+    setLoading(true);
     try {
       const userData = localStorage.getItem('user');
       const user = userData ? JSON.parse(userData) : null;
-      const userIdParam = user ? `?user_id=${user.id}` : '';
+      let url = '/api/posts';
+      const params = new URLSearchParams();
+      
+      if (user) params.append('user_id', user.id);
+      if (selectedCategory !== 'all') params.append('category_id', selectedCategory.toString());
 
-      const res = await authFetch(`/api/posts${userIdParam}`);
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const res = await authFetch(url);
       if (res.ok) {
         const data = await res.json();
         setPosts(data);
@@ -125,12 +157,27 @@ export default function HomePage() {
         </section>
 
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar -mx-5 px-5">
-          <button className="flex-shrink-0 px-6 py-2.5 rounded-full bg-primary text-on-primary font-medium text-sm transition-all shadow-sm">
+          <button 
+            onClick={() => setSelectedCategory('all')}
+            className={`flex-shrink-0 px-6 py-2.5 rounded-full font-medium text-sm transition-all shadow-sm ${
+              selectedCategory === 'all' 
+                ? 'bg-primary text-on-primary' 
+                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+            }`}
+          >
             전체
           </button>
-          {['인간관계', '이별', '짝사랑', '진로', '직장', '일상'].map(cat => (
-            <button key={cat} className="flex-shrink-0 px-6 py-2.5 rounded-full bg-surface-container text-on-surface-variant font-medium text-sm hover:bg-surface-container-high transition-all">
-              {cat}
+          {categories.map(cat => (
+            <button 
+              key={cat.id} 
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`flex-shrink-0 px-6 py-2.5 rounded-full font-medium text-sm transition-all shadow-sm ${
+                selectedCategory === cat.id
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+              }`}
+            >
+              {cat.name}
             </button>
           ))}
         </div>

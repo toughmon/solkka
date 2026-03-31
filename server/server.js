@@ -368,9 +368,9 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
 
 // 3. 게시글 목록 조회
 app.get('/api/posts', async (req, res) => {
-  const { user_id } = req.query;
+  const { user_id, category_id } = req.query;
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT 
         p.id, 
         p.title, 
@@ -385,8 +385,18 @@ app.get('/api/posts', async (req, res) => {
       FROM solkka.post p
       JOIN solkka.category c ON p.category_id = c.id
       LEFT JOIN solkka.user_account u ON p.user_account_id = u.id
-      ORDER BY p.created_at DESC
-    `, [user_id || null]);
+    `;
+    const params = [user_id || null];
+    let paramIndex = 2;
+
+    if (category_id && category_id !== 'all') {
+      query += ` WHERE p.category_id = $${paramIndex}`;
+      params.push(category_id);
+    }
+
+    query += ` ORDER BY p.created_at DESC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Fetch Posts Error:', error);

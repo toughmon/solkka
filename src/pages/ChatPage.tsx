@@ -11,8 +11,10 @@ interface ChatRoom {
   last_message: string | null;
   last_message_at: string | null;
   unread_count: number;
+  post_content: string | null;
   is_active: boolean;
 }
+
 
 interface CounselingRequest {
   id: number;
@@ -179,6 +181,11 @@ export default function ChatPage() {
                       <span className="font-bold text-sm text-on-surface truncate">{room.partner_nickname}</span>
                       <span className="text-[10px] text-on-surface-variant/60 flex-shrink-0 ml-2">{getTimeAgo(room.last_message_at)}</span>
                     </div>
+                    {room.post_content && (
+                      <p className="text-[10px] text-primary/70 truncate mb-1 bg-primary/5 inline-block px-1.5 py-0.5 rounded max-w-[90%]">
+                        {room.post_content}
+                      </p>
+                    )}
                     <p className={`text-xs truncate ${room.unread_count > 0 ? 'text-on-surface font-semibold' : 'text-on-surface-variant/60'}`}>
                       {room.last_message || '대화를 시작해보세요 👋'}
                     </p>

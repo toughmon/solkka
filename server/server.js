@@ -813,10 +813,13 @@ app.get('/api/chat-rooms', authenticateToken, async (req, res) => {
         CASE WHEN cr.user1_id = $1 THEN u2.avatar_url ELSE u1.avatar_url END as partner_avatar_url,
         lm.content as last_message,
         lm.created_at as last_message_at,
-        (SELECT COUNT(*) FROM solkka.chat_message WHERE chat_room_id = cr.id AND sender_id != $1 AND is_read = FALSE)::int as unread_count
+        (SELECT COUNT(*) FROM solkka.chat_message WHERE chat_room_id = cr.id AND sender_id != $1 AND is_read = FALSE)::int as unread_count,
+        p.content as post_content
       FROM solkka.chat_room cr
       JOIN solkka.user_account u1 ON cr.user1_id = u1.id
       JOIN solkka.user_account u2 ON cr.user2_id = u2.id
+      LEFT JOIN solkka.counseling_request creq ON cr.counseling_request_id = creq.id
+      LEFT JOIN solkka.post p ON creq.post_id = p.id
       LEFT JOIN LATERAL (
         SELECT content, created_at FROM solkka.chat_message 
         WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1
@@ -881,6 +884,25 @@ app.get('/api/chat-rooms/:id/messages', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Fetch Messages Error:', error);
     res.status(500).json({ message: '메시지를 가져오지 못했습니다.' });
+  }
+});
+
+// 17-5. 읽지 않은 총 메시지 수 조회
+app.get('/api/chat-rooms/unread-count', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) as unread_count
+       FROM solkka.chat_message cm
+       JOIN solkka.chat_room cr ON cm.chat_room_id = cr.id
+       WHERE (cr.user1_id = $1 OR cr.user2_id = $1)
+         AND cm.sender_id != $1
+         AND cm.is_read = FALSE`,
+      [req.user.id]
+    );
+    res.json({ unreadCount: parseInt(result.rows[0].unread_count) || 0 });
+  } catch (error) {
+    console.error('Fetch Unread Count Error:', error);
+    res.status(500).json({ message: '읽지 않은 메시지 수를 가져오지 못했습니다.' });
   }
 });
 

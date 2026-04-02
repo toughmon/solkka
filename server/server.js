@@ -546,6 +546,74 @@ app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
   }
 });
 
+// 7-6. 내 최근 활동 목록 (게시글, 채팅 혼합 최대 3개)
+app.get('/api/users/me/activities', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const resultArr = [];
+
+    const postsResult = await pool.query(`
+      SELECT p.id, p.title, p.content, p.created_at, p.like_count, 
+             c.name as category_name,
+             (SELECT COUNT(*) FROM solkka.comment WHERE post_id = p.id AND is_deleted = false) as comment_count
+      FROM solkka.post p
+      JOIN solkka.category c ON p.category_id = c.id
+      WHERE p.user_account_id = $1
+      ORDER BY p.created_at DESC
+      LIMIT 3
+    `, [userId]);
+
+    postsResult.rows.forEach(p => {
+      resultArr.push({
+        type: 'post',
+        id: p.id,
+        title: p.title,
+        content: p.content,
+        created_at: p.created_at,
+        categoryName: p.category_name,
+        likeCount: p.like_count || 0,
+        commentCount: p.comment_count || 0
+      });
+    });
+
+    const chatsResult = await pool.query(`
+      SELECT cr.id, cr.created_at, cr.is_active,
+        CASE WHEN cr.user1_id = $1 THEN u2.nickname ELSE u1.nickname END as partner_nickname,
+        CASE WHEN cr.user1_id = $1 THEN u2.avatar_url ELSE u1.avatar_url END as partner_avatar_url,
+        lm.content as last_message,
+        lm.created_at as last_message_at
+      FROM solkka.chat_room cr
+      JOIN solkka.user_account u1 ON cr.user1_id = u1.id
+      JOIN solkka.user_account u2 ON cr.user2_id = u2.id
+      LEFT JOIN LATERAL (
+        SELECT content, created_at FROM solkka.chat_message 
+        WHERE chat_room_id = cr.id ORDER BY created_at DESC LIMIT 1
+      ) lm ON TRUE
+      WHERE (cr.user1_id = $1 OR cr.user2_id = $1) AND cr.is_active = TRUE
+      ORDER BY COALESCE(lm.created_at, cr.created_at) DESC
+      LIMIT 3
+    `, [userId]);
+
+    chatsResult.rows.forEach(c => {
+      resultArr.push({
+        type: 'chat',
+        id: c.id,
+        partnerNickname: c.partner_nickname,
+        partnerAvatarUrl: c.partner_avatar_url,
+        lastMessage: c.last_message,
+        created_at: c.last_message_at || c.created_at,
+      });
+    });
+
+    resultArr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    res.json(resultArr.slice(0, 3));
+
+  } catch (error) {
+    console.error('Fetch Activities Error:', error);
+    res.status(500).json({ message: '최근 활동 정보를 가져오지 못했습니다.' });
+  }
+});
+
 // 8. 게시글 좋아요 토글
 app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
   const { id } = req.params;

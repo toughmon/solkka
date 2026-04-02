@@ -4,10 +4,23 @@ import BottomNavBar from '../components/BottomNavBar';
 import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
 
+const getTimeAgo = (dateStr: string) => {
+  if (!dateStr) return '';
+  const diffMs = new Date().getTime() - new Date(dateStr).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHrs / 24);
+
+  if (diffMins < 60) return `${Math.max(0, diffMins)}분 전`;
+  if (diffHrs < 24) return `${diffHrs}시간 전`;
+  return `${diffDays}일 전`;
+};
+
 export default function MyPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState({ postCount: 0, commentCount: 0, chatCount: 0 });
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -29,8 +42,21 @@ export default function MyPage() {
       }
     };
 
+    const fetchActivities = async () => {
+      try {
+        const res = await authFetch('/api/users/me/activities');
+        if (res.ok) {
+          const data = await res.json();
+          setRecentActivities(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch activities:', error);
+      }
+    };
+
     if (user) {
       fetchStats();
+      fetchActivities();
     }
   }, [user]);
 
@@ -193,67 +219,52 @@ export default function MyPage() {
             <button className="text-sm font-semibold text-primary">전체보기</button>
           </div>
 
-          {/* Card 1: Recent Post */}
-          <div className="group bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-primary-dim"></span>
-                <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">게시글 • 2시간 전</span>
-              </div>
-              <span className="material-symbols-outlined text-outline-variant cursor-pointer hover:text-primary transition-colors shrink-0">more_horiz</span>
-            </div>
-            <h4 className="font-headline font-semibold text-lg text-on-surface mb-2">태풍 속에서 빛을 찾다...</h4>
-            <p className="font-body text-sm text-on-surface-variant leading-relaxed mb-4 line-clamp-2">
-              가끔은 나 혼자만 이런 생각으로 힘들어하는 것 같았지만, 이 공간이 있다는 걸 떠올렸어요. 오늘은 특히 더 힘든 하루였네요...
-            </p>
-            <div className="flex items-center gap-6 pt-4 border-t border-surface-container">
-              <div className="flex items-center gap-1.5 text-on-surface-variant">
-                <span className="material-symbols-outlined text-sm shrink-0">favorite</span>
-                <span className="text-xs font-bold">24</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-on-surface-variant">
-                <span className="material-symbols-outlined text-sm shrink-0">comment</span>
-                <span className="text-xs font-bold">8</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Active Chat */}
-          <div className="bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] border-l-4 border-secondary-fixed">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-2xl bg-surface-container-high overflow-hidden">
-                  <img alt="Chat Partner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOdHnkpyKJUckJXOYGrODao9Sm4RMwNr1ob-vh2cHc4jFqekfxJ86Uogg6bYDgWPoU0-KpHKFcmDpMReJqfouCcecJh5yjPojyrpx_Vi3wY3PmgrYiiCC_ujupmMcOFVADQQE9huX5lKQ75qk6f__ayMi06UfDN-OXJSPBdVzV07hFmyr8Q_N-ISyuAv8Ikf8WZnQjbPEcsFhU_66aOlip1H-QRGcoOvPIZ8S8H1Rb1PJ5mdx7VjdV7Vo3jpkk_kwDrrrxDViz8Sk" />
+          {recentActivities.length === 0 ? (
+            <div className="text-center text-on-surface-variant py-8 text-sm">최근 활동 내역이 없습니다.</div>
+          ) : recentActivities.map((act, idx) => (
+            act.type === 'post' ? (
+              <div key={idx} className="group bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer" onClick={() => navigate(`/posts/${act.id}`)}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary-dim"></span>
+                    <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">{act.categoryName} • {getTimeAgo(act.created_at)}</span>
+                  </div>
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-tertiary border-2 border-white"></div>
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-headline font-bold text-on-surface">따뜻한 영혼</span>
-                  <span className="text-[10px] font-medium text-on-surface-variant">현재 접속 중</span>
+                <h4 className="font-headline font-semibold text-lg text-on-surface mb-2">{act.title}</h4>
+                <p className="font-body text-sm text-on-surface-variant leading-relaxed mb-4 line-clamp-2">
+                  {act.content}
+                </p>
+                <div className="flex items-center gap-6 pt-4 border-t border-surface-container">
+                  <div className="flex items-center gap-1.5 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-sm shrink-0">favorite</span>
+                    <span className="text-xs font-bold">{act.likeCount}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-sm shrink-0">comment</span>
+                    <span className="text-xs font-bold">{act.commentCount}</span>
+                  </div>
                 </div>
-                <p className="font-body text-sm text-on-surface-variant line-clamp-1 italic">"아까 제 이야기를 들어주셔서 감사합니다..."</p>
               </div>
-            </div>
-          </div>
-
-          {/* Card 3: Recent Post */}
-          <div className="group bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-tertiary"></span>
-                <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest">생각 • 1일 전</span>
+            ) : (
+              <div key={idx} className="bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] border-l-4 border-secondary-fixed cursor-pointer" onClick={() => navigate(`/chat/${act.id}`)}>
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-2xl bg-surface-container-high overflow-hidden">
+                      <img alt="Chat Partner" src={act.partnerAvatarUrl} className="w-full h-full object-cover" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-tertiary border-2 border-white"></div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-headline font-bold text-on-surface">{act.partnerNickname}</span>
+                      <span className="text-[10px] font-medium text-on-surface-variant">{getTimeAgo(act.created_at)}</span>
+                    </div>
+                    <p className="font-body text-sm text-on-surface-variant line-clamp-1 italic">"{act.lastMessage}"</p>
+                  </div>
+                </div>
               </div>
-            </div>
-            <h4 className="font-headline font-semibold text-lg text-on-surface mb-2">작은 성공도 중요해요.</h4>
-            <p className="font-body text-sm text-on-surface-variant leading-relaxed line-clamp-2">
-              오늘은 나가서 10분 동안 신선한 공기를 마셨어요. 큰일은 아니지만, 그래도 발전이네요.
-            </p>
-            <div className="flex items-center gap-4 mt-4">
-              <span className="px-3 py-1 bg-surface-container text-[10px] font-bold rounded-lg text-on-surface-variant">치유</span>
-              <span className="px-3 py-1 bg-surface-container text-[10px] font-bold rounded-lg text-on-surface-variant">성장</span>
-            </div>
-          </div>
+            )
+          ))}
         </section>
 
         {/* Support Section */}

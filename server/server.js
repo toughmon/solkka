@@ -67,6 +67,44 @@ const transporter = nodemailer.createTransport({
 });
 
 /* ================================
+   게이미피케이션 (Gamification) 헬퍼
+================================ */
+const awardGamification = async (userId, actionType) => {
+  let points = 0;
+  let tempChange = 0.0;
+  
+  switch(actionType) {
+    case 'WRITE_POST': points = 2; tempChange = 0.1; break;
+    case 'WRITE_COMMENT': points = 1; tempChange = 0.1; break;
+    case 'RECEIVE_LIKE': points = 5; tempChange = 0.2; break;
+    case 'DAILY_CHECKIN': points = 10; tempChange = 0.5; break;
+    default: return;
+  }
+
+  try {
+    // 트랜잭션 없이 로깅 및 업데이트 진행
+    await pool.query(
+      'INSERT INTO solkka.gamification_log (user_account_id, action_type, points_earned, temperature_change) VALUES ($1, $2, $3, $4)',
+      [userId, actionType, points, tempChange]
+    );
+
+    await pool.query(
+      'UPDATE solkka.user_account SET points = points + $1, temperature = temperature + $2 WHERE id = $3',
+      [points, tempChange, userId]
+    );
+  } catch (err) {
+    console.error('Gamification Error:', err);
+  }
+};
+
+const getLevelName = (points) => {
+  if (points < 50) return '초보 리스너';
+  if (points < 200) return '다정한 이웃';
+  if (points < 500) return '따뜻한 위로가';
+  return '마음의 안식처';
+};
+
+/* ================================
    라우트 (API Endpoints)
 ================================ */
 
@@ -191,7 +229,10 @@ app.post('/api/auth/verify', async (req, res) => {
         id: signupResult.rows[0].id,
         email: email,
         nickname: randomNickname,
-        avatar_url: avatarUrl
+        avatar_url: avatarUrl,
+        points: 0,
+        temperature: 36.5,
+        levelName: '초보 리스너'
       }
     });
 
@@ -215,7 +256,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, email, password_hash, nickname, avatar_url FROM solkka.user_account WHERE email = $1',
+      'SELECT id, email, password_hash, nickname, avatar_url, points, temperature FROM solkka.user_account WHERE email = $1',
       [email]
     );
 
@@ -258,7 +299,10 @@ app.post('/api/auth/login', async (req, res) => {
         id: user.id,
         email: user.email,
         nickname: user.nickname,
-        avatar_url: user.avatar_url
+        avatar_url: user.avatar_url,
+        points: user.points || 0,
+        temperature: parseFloat(user.temperature) || 36.5,
+        levelName: getLevelName(user.points || 0)
       }
     });
 
@@ -358,6 +402,11 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
        RETURNING id`,
       [user_account_id || null, category_id, title, content, is_counseling_requested || false]
     );
+
+    // 글 작성 성공 로그 & 게이미피케이션 (+2점, +0.1도)
+    if (user_account_id) {
+      await awardGamification(user_account_id, 'WRITE_POST');
+    }
 
     res.json({ success: true, message: '게시글이 성공적으로 등록되었습니다.', postId: result.rows[0].id });
   } catch (error) {
@@ -474,6 +523,11 @@ app.post('/api/posts/:id/comments', authenticateToken, async (req, res) => {
       [id, user_account_id || null, content, parent_comment_id || null]
     );
 
+    // 댓글 등록 성공 로깅 (+1점, +0.1도)
+    if (user_account_id) {
+      await awardGamification(user_account_id, 'WRITE_COMMENT');
+    }
+
     res.json({ success: true, message: '댓글이 등록되었습니다.', commentId: result.rows[0].id });
   } catch (error) {
     console.error('Create Comment Error:', error);
@@ -535,10 +589,20 @@ app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
     );
     const chatCount = parseInt(chatCountResult.rows[0].count) || 0;
 
+    const userResult = await pool.query(
+      'SELECT points, temperature FROM solkka.user_account WHERE id = $1',
+      [userId]
+    );
+    const points = userResult.rows[0]?.points || 0;
+    const temperature = parseFloat(userResult.rows[0]?.temperature) || 36.5;
+
     res.json({
       postCount,
       commentCount,
-      chatCount
+      chatCount,
+      points,
+      temperature,
+      levelName: getLevelName(points)
     });
   } catch (error) {
     console.error('Fetch Stats Error:', error);
@@ -634,6 +698,10 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
       [user_account_id, id]
     );
 
+    // 게시글 작성자 ID 조회 (본인 글에 좋아요 하는 건 막지 않지만, 타인이 누른 경우 점수 부여)
+    const postResult = await client.query('SELECT user_account_id FROM solkka.post WHERE id = $1', [id]);
+    const authorId = postResult.rows.length > 0 ? postResult.rows[0].user_account_id : null;
+
     if (check.rows.length > 0) {
       // 이미 있으면 삭제 (취소)
       await client.query(
@@ -657,6 +725,10 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
         [id]
       );
       await client.query('COMMIT');
+      
+      if (authorId && authorId !== user_account_id) {
+        await awardGamification(authorId, 'RECEIVE_LIKE'); // 좋아요 받을 시 +5점, +0.2도
+      }
       res.json({ success: true, liked: true });
     }
   } catch (error) {

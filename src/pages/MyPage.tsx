@@ -19,7 +19,7 @@ const getTimeAgo = (dateStr: string) => {
 export default function MyPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
-  const [stats, setStats] = useState({ postCount: 0, commentCount: 0, chatCount: 0 });
+  const [stats, setStats] = useState({ postCount: 0, commentCount: 0, chatCount: 0, points: 0, temperature: 36.5, levelName: '초보 리스너' });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
@@ -175,12 +175,17 @@ export default function MyPage() {
             <p className="font-body text-sm text-on-primary-container/70 mt-1">
               {user ? user.email : '로그인이 필요합니다'}
             </p>
-            <div className="mt-6 flex gap-3">
-              <span className="px-4 py-1.5 bg-tertiary-container text-on-tertiary-container text-xs font-semibold rounded-full">
-                레벨 4 리스너
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <span className="px-4 py-1 bg-tertiary-container text-on-tertiary-container text-xs font-semibold rounded-full shadow-sm border border-tertiary-container/50 flex items-center justify-center h-[32px]">
+                {stats.levelName || '초보 리스너'}
               </span>
-              <span className="px-4 py-1.5 bg-primary-container text-on-primary-container text-xs font-semibold rounded-full">
-                따뜻한 마음
+              <span className="px-4 py-1 bg-primary-container text-on-primary-container text-xs font-semibold rounded-full shadow-sm border border-primary-container/50 flex items-center justify-center gap-1 h-[32px]">
+                <span className="material-symbols-outlined text-[14px]">device_thermostat</span>
+                <span>{stats.temperature}°C</span>
+              </span>
+              <span className="px-4 py-1 bg-secondary-container text-on-secondary-container text-xs font-semibold rounded-full shadow-sm border border-secondary-container/50 flex items-center justify-center gap-1 h-[32px]">
+                <span className="material-symbols-outlined text-[14px]">stars</span>
+                <span>{stats.points} P</span>
               </span>
             </div>
           </div>

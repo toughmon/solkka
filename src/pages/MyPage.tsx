@@ -7,6 +7,7 @@ import { authFetch } from '../utils/api';
 export default function MyPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState({ postCount: 0, commentCount: 0, chatCount: 0 });
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
@@ -14,6 +15,24 @@ export default function MyPage() {
       setUser(JSON.parse(userData));
     }
   }, []);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await authFetch('/api/users/me/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
 
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false,
@@ -144,34 +163,19 @@ export default function MyPage() {
           <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl"></div>
         </section>
 
-        {/* Activity Stats: Asymmetric Bento Style */}
-        <section className="grid grid-cols-2 grid-rows-2 gap-4 h-48">
-          <div className="col-span-1 row-span-2 bg-surface-container-lowest rounded-3xl p-6 flex flex-col justify-between items-start transition-transform hover:scale-[1.02] duration-300">
-            <div className="w-10 h-10 rounded-2xl bg-primary-fixed flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined shrink-0">chat_bubble</span>
-            </div>
-            <div>
-              <span className="block text-3xl font-bold font-headline text-on-surface">12</span>
-              <span className="text-xs font-medium text-on-surface-variant tracking-wider uppercase">작성한 글</span>
-            </div>
+        {/* Activity Stats: Simple Flat Cards */}
+        <section className="flex gap-2 w-full">
+          <div className="flex-1 bg-surface-container-lowest rounded-2xl py-4 px-1 flex flex-col items-center justify-center border border-surface-container/60 shadow-sm transition-transform hover:scale-[1.02]">
+             <span className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant mb-1 whitespace-nowrap">작성한 글</span>
+             <span className="text-2xl font-bold font-headline text-on-surface">{stats.postCount}</span>
           </div>
-          <div className="col-span-1 row-span-1 bg-surface-container-lowest rounded-3xl p-5 flex items-center gap-4 transition-transform hover:scale-[1.02] duration-300">
-            <div className="w-10 h-10 rounded-2xl bg-secondary-container flex items-center justify-center text-on-secondary-container">
-              <span className="material-symbols-outlined shrink-0">forum</span>
-            </div>
-            <div>
-              <span className="block text-xl font-bold font-headline text-on-surface">48</span>
-              <span className="text-[10px] font-medium text-on-surface-variant uppercase">남긴 댓글</span>
-            </div>
+          <div className="flex-1 bg-surface-container-lowest rounded-2xl py-4 px-1 flex flex-col items-center justify-center border border-surface-container/60 shadow-sm transition-transform hover:scale-[1.02]">
+             <span className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant mb-1 whitespace-nowrap">남긴 댓글</span>
+             <span className="text-2xl font-bold font-headline text-on-surface">{stats.commentCount}</span>
           </div>
-          <div className="col-span-1 row-span-1 bg-surface-container-lowest rounded-3xl p-5 flex items-center gap-4 transition-transform hover:scale-[1.02] duration-300">
-            <div className="w-10 h-10 rounded-2xl bg-tertiary-container flex items-center justify-center text-on-tertiary-container">
-              <span className="material-symbols-outlined shrink-0">bolt</span>
-            </div>
-            <div>
-              <span className="block text-xl font-bold font-headline text-on-surface">3</span>
-              <span className="text-[10px] font-medium text-on-surface-variant uppercase">진행 중인 채팅</span>
-            </div>
+          <div className="flex-1 bg-surface-container-lowest rounded-2xl py-4 px-1 flex flex-col items-center justify-center border border-surface-container/60 shadow-sm transition-transform hover:scale-[1.02]">
+             <span className="text-[10px] sm:text-[11px] font-medium text-on-surface-variant mb-1 whitespace-nowrap">진행중인 채팅</span>
+             <span className="text-2xl font-bold font-headline text-on-surface">{stats.chatCount}</span>
           </div>
         </section>
 

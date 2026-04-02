@@ -512,6 +512,40 @@ app.patch('/api/users/:id/avatar', authenticateToken, async (req, res) => {
   }
 });
 
+// 7-5. 내 활동 통계 (작성한 글, 남긴 댓글, 진행중인 채팅 수)
+app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const postCountResult = await pool.query(
+      'SELECT COUNT(*) FROM solkka.post WHERE user_account_id = $1',
+      [userId]
+    );
+    const postCount = parseInt(postCountResult.rows[0].count) || 0;
+
+    const commentCountResult = await pool.query(
+      'SELECT COUNT(*) FROM solkka.comment WHERE user_account_id = $1 AND is_deleted = FALSE',
+      [userId]
+    );
+    const commentCount = parseInt(commentCountResult.rows[0].count) || 0;
+
+    const chatCountResult = await pool.query(
+      'SELECT COUNT(*) FROM solkka.chat_room WHERE (user1_id = $1 OR user2_id = $1) AND is_active = TRUE',
+      [userId]
+    );
+    const chatCount = parseInt(chatCountResult.rows[0].count) || 0;
+
+    res.json({
+      postCount,
+      commentCount,
+      chatCount
+    });
+  } catch (error) {
+    console.error('Fetch Stats Error:', error);
+    res.status(500).json({ message: '통계 정보를 가져오지 못했습니다.' });
+  }
+});
+
 // 8. 게시글 좋아요 토글
 app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
   const { id } = req.params;

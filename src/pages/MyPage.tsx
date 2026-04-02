@@ -44,7 +44,7 @@ export default function MyPage() {
 
     const fetchActivities = async () => {
       try {
-        const res = await authFetch('/api/users/me/activities');
+        const res = await authFetch('/api/users/me/activities?limit=3');
         if (res.ok) {
           const data = await res.json();
           setRecentActivities(data);
@@ -205,25 +205,25 @@ export default function MyPage() {
           </div>
         </section>
 
-        {/* Tabs */}
-        <nav className="flex gap-2 p-1 bg-surface-container-low rounded-2xl">
-          <button className="flex-1 py-3 px-4 rounded-xl text-sm font-semibold bg-surface-container-lowest text-primary shadow-sm transition-all">내가 쓴 글</button>
-          <button className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-all">남긴 댓글</button>
-          <button className="flex-1 py-3 px-4 rounded-xl text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-all">저장한 글</button>
-        </nav>
+
 
         {/* Recent Activity Feed */}
         <section className="space-y-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-4 mt-8">
             <h3 className="font-headline font-bold text-lg text-on-surface">최근 활동</h3>
-            <button className="text-sm font-semibold text-primary">전체보기</button>
+            <button 
+              onClick={() => navigate('/my/activities')}
+              className="text-sm font-semibold text-primary hover:text-primary-dim transition-colors"
+            >
+              전체보기
+            </button>
           </div>
 
           {recentActivities.length === 0 ? (
             <div className="text-center text-on-surface-variant py-8 text-sm">최근 활동 내역이 없습니다.</div>
           ) : recentActivities.map((act, idx) => (
             act.type === 'post' ? (
-              <div key={idx} className="group bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer" onClick={() => navigate(`/posts/${act.id}`)}>
+              <div key={idx} className="group bg-surface-container-lowest rounded-[1.5rem] p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] cursor-pointer" onClick={() => navigate(`/post/${act.id}`)}>
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-primary-dim"></span>
@@ -267,16 +267,7 @@ export default function MyPage() {
           ))}
         </section>
 
-        {/* Support Section */}
-        <section className="p-6 rounded-[2rem] bg-secondary-container/50 border border-secondary-container flex items-center justify-between">
-          <div className="max-w-[70%]">
-            <h5 className="font-headline font-bold text-on-secondary-container mb-1">지금 당장 도움이 필요하신가요?</h5>
-            <p className="font-body text-xs text-on-secondary-container/80 leading-relaxed">검증된 상담원이 24시간 언제나 진심 어린 대화를 위해 대기하고 있습니다.</p>
-          </div>
-          <button className="w-12 h-12 rounded-2xl bg-on-secondary-container text-surface flex items-center justify-center shadow-lg transition-transform active:scale-95">
-            <span className="material-symbols-outlined shrink-0">arrow_forward</span>
-          </button>
-        </section>
+
       </main>
 
       {/* BottomNavBar Component */}

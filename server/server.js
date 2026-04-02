@@ -546,10 +546,11 @@ app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
   }
 });
 
-// 7-6. 내 최근 활동 목록 (게시글, 채팅 혼합 최대 3개)
+// 7-6. 내 최근 활동 목록 (게시글, 채팅 혼합)
 app.get('/api/users/me/activities', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
+    const limit = parseInt(req.query.limit) || 50;
     const resultArr = [];
 
     const postsResult = await pool.query(`
@@ -560,8 +561,8 @@ app.get('/api/users/me/activities', authenticateToken, async (req, res) => {
       JOIN solkka.category c ON p.category_id = c.id
       WHERE p.user_account_id = $1
       ORDER BY p.created_at DESC
-      LIMIT 3
-    `, [userId]);
+      LIMIT $2
+    `, [userId, limit]);
 
     postsResult.rows.forEach(p => {
       resultArr.push({
@@ -591,8 +592,8 @@ app.get('/api/users/me/activities', authenticateToken, async (req, res) => {
       ) lm ON TRUE
       WHERE (cr.user1_id = $1 OR cr.user2_id = $1) AND cr.is_active = TRUE
       ORDER BY COALESCE(lm.created_at, cr.created_at) DESC
-      LIMIT 3
-    `, [userId]);
+      LIMIT $2
+    `, [userId, limit]);
 
     chatsResult.rows.forEach(c => {
       resultArr.push({
@@ -606,7 +607,7 @@ app.get('/api/users/me/activities', authenticateToken, async (req, res) => {
     });
 
     resultArr.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    res.json(resultArr.slice(0, 3));
+    res.json(resultArr.slice(0, limit));
 
   } catch (error) {
     console.error('Fetch Activities Error:', error);

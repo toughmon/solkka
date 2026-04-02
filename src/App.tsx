@@ -9,6 +9,7 @@ import ChatRoomPage from './pages/ChatRoomPage';
 import CreatePostPage from './pages/CreatePostPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MyPage from './pages/MyPage';
+import ActivityTimelinePage from './pages/ActivityTimelinePage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/create" element={<CreatePostPage />} />
         <Route path="/post/:id" element={<PostDetailPage />} />
         <Route path="/mypage" element={<MyPage />} />
+        <Route path="/my/activities" element={<ActivityTimelinePage />} />
       </Routes>
     </BrowserRouter>
   );

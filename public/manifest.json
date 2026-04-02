@@ -1,0 +1,17 @@
+{
+  "name": "Solkka",
+  "short_name": "Solkka",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf9f8",
+  "theme_color": "#1a1c1e",
+  "description": "익명 심리 상담 및 소통 플랫폼",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -16,6 +16,14 @@ const getTimeAgo = (dateStr: string) => {
   return `${diffDays}일 전`;
 };
 
+const buildFallbackAvatar = (seed?: string) =>
+  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed || 'solkka-user')}`;
+
+const safeAvatarSrc = (src?: string | null, seed?: string) => {
+  if (!src || src === 'null' || src === 'undefined') return buildFallbackAvatar(seed);
+  return src;
+};
+
 export default function MyPage() {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
@@ -255,7 +263,18 @@ export default function MyPage() {
                 <div className="flex items-center gap-4">
                   <div className="relative">
                     <div className="w-12 h-12 rounded-2xl bg-surface-container-high overflow-hidden">
-                      <img alt="Chat Partner" src={act.partnerAvatarUrl} className="w-full h-full object-cover" />
+                      <img
+                        alt="Chat Partner"
+                        src={safeAvatarSrc(act.partnerAvatarUrl, act.partnerNickname)}
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (!img.dataset.fallbackApplied) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = buildFallbackAvatar(act.partnerNickname);
+                          }
+                        }}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-tertiary border-2 border-white"></div>
                   </div>

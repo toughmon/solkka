@@ -14,6 +14,14 @@ const getTimeAgo = (dateStr: string) => {
   return `${diffDays}일 전`;
 };
 
+const buildFallbackAvatar = (seed?: string) =>
+  `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed || 'solkka-user')}`;
+
+const safeAvatarSrc = (src?: string | null, seed?: string) => {
+  if (!src || src === 'null' || src === 'undefined') return buildFallbackAvatar(seed);
+  return src;
+};
+
 export default function ActivityTimelinePage() {
   const navigate = useNavigate();
   const [activities, setActivities] = useState<any[]>([]);
@@ -106,7 +114,18 @@ export default function ActivityTimelinePage() {
                     </div>
                     <div className="flex items-center gap-4 mt-2">
                       <div className="w-12 h-12 rounded-2xl bg-surface-container-high overflow-hidden shrink-0 shadow-sm border border-surface-container/50">
-                        <img alt="Chat Partner" src={act.partnerAvatarUrl} className="w-full h-full object-cover" />
+                        <img
+                          alt="Chat Partner"
+                          src={safeAvatarSrc(act.partnerAvatarUrl, act.partnerNickname)}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.fallbackApplied) {
+                              img.dataset.fallbackApplied = '1';
+                              img.src = buildFallbackAvatar(act.partnerNickname);
+                            }
+                          }}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="flex-1">
                         <span className="font-headline font-bold text-on-surface text-base block mb-0.5">

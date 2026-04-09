@@ -1,6 +1,10 @@
 import { io, Socket } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.206.171:3001';
+const API_URL = (
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL ||
+  ''
+).trim().replace(/\/+$/, '');
 
 let socket: Socket | null = null;
 
@@ -8,7 +12,7 @@ export function getSocket(): Socket {
   const token = localStorage.getItem('accessToken');
 
   if (!socket) {
-    socket = io(API_URL, {
+    socket = io(API_URL || window.location.origin, {
       auth: { token },
       autoConnect: false,
       reconnection: true,

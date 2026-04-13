@@ -31,11 +31,19 @@ export default function MyPage() {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken');
     const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
+    if (!accessToken || !userData) {
+      navigate('/login', { replace: true });
+      return;
     }
-  }, []);
+
+    try {
+      setUser(JSON.parse(userData));
+    } catch {
+      navigate('/login', { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -144,12 +152,14 @@ export default function MyPage() {
             <h1 className="font-headline font-semibold text-lg tracking-tight text-[#4c6272] dark:text-[#a5c8df]">마이페이지</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleLogout}
-              className="text-red-500 font-medium text-sm hover:opacity-80 transition-opacity"
-            >
-              로그아웃
-            </button>
+            {user && (
+              <button
+                onClick={handleLogout}
+                className="text-red-500 font-medium text-sm hover:opacity-80 transition-opacity"
+              >
+                로그아웃
+              </button>
+            )}
             <button className="text-[#4c6272] dark:text-[#a5c8df] hover:opacity-80 transition-opacity">
               <span className="material-symbols-outlined shrink-0" style={{ display: 'inline-block', lineHeight: 1 }}>settings</span>
             </button>

@@ -10,6 +10,7 @@ import CreatePostPage from './pages/CreatePostPage';
 import PostDetailPage from './pages/PostDetailPage';
 import MyPage from './pages/MyPage';
 import ActivityTimelinePage from './pages/ActivityTimelinePage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -20,12 +21,12 @@ function App() {
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/chat/:roomId" element={<ChatRoomPage />} />
-        <Route path="/create" element={<CreatePostPage />} />
+        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+        <Route path="/chat/:roomId" element={<ProtectedRoute><ChatRoomPage /></ProtectedRoute>} />
+        <Route path="/create" element={<ProtectedRoute><CreatePostPage /></ProtectedRoute>} />
         <Route path="/post/:id" element={<PostDetailPage />} />
-        <Route path="/mypage" element={<MyPage />} />
-        <Route path="/my/activities" element={<ActivityTimelinePage />} />
+        <Route path="/mypage" element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
+        <Route path="/my/activities" element={<ProtectedRoute><ActivityTimelinePage /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

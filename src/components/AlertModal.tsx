@@ -6,6 +6,8 @@ interface AlertModalProps {
   message: string;
   onConfirm: () => void;
   confirmText?: string;
+  onCancel?: () => void;
+  cancelText?: string;
   subText?: string;
 }
 
@@ -15,6 +17,8 @@ export default function AlertModal({
   message, 
   onConfirm, 
   confirmText = "확인", 
+  onCancel,
+  cancelText = "취소",
   subText = "Solkka Echo Sanctuary" 
 }: AlertModalProps) {
   if (!isOpen) return null;
@@ -54,12 +58,22 @@ export default function AlertModal({
 
         {/* Actions */}
         <div className="w-full">
-          <button 
-            onClick={onConfirm}
-            className="w-full py-4 px-6 bg-gradient-to-br from-primary to-primary-dim text-white font-headline font-semibold rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all duration-300"
-          >
-            {confirmText}
-          </button>
+          <div className={`grid gap-3 ${onCancel ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="w-full py-4 px-6 bg-surface-container-low text-on-surface font-headline font-semibold rounded-xl border border-surface-container hover:opacity-95 active:scale-[0.98] transition-all duration-300"
+              >
+                {cancelText}
+              </button>
+            )}
+            <button 
+              onClick={onConfirm}
+              className="w-full py-4 px-6 bg-gradient-to-br from-primary to-primary-dim text-white font-headline font-semibold rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all duration-300"
+            >
+              {confirmText}
+            </button>
+          </div>
           <p className="mt-6 text-[11px] font-label tracking-widest uppercase text-outline opacity-60">
             {subText}
           </p>

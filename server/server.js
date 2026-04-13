@@ -1173,6 +1173,38 @@ app.post('/api/chat-rooms/:id/messages', authenticateToken, async (req, res) => 
   }
 });
 
+// 19. 채팅방 종료
+app.patch('/api/chat-rooms/:id/close', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(
+      `UPDATE solkka.chat_room
+       SET is_active = FALSE
+       WHERE id = $1
+         AND is_active = TRUE
+         AND (user1_id = $2 OR user2_id = $2)
+       RETURNING id, user1_id, user2_id`,
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: '종료할 수 있는 대화방을 찾지 못했습니다.' });
+    }
+
+    const room = result.rows[0];
+    const partnerId = room.user1_id === req.user.id ? room.user2_id : room.user1_id;
+
+    io.to(`room_${id}`).emit('chat_closed', { roomId: Number(id) });
+    io.to(`user_${partnerId}`).emit('chat_closed', { roomId: Number(id) });
+
+    res.json({ success: true, message: '대화를 종료했습니다.' });
+  } catch (error) {
+    console.error('Close Chat Room Error:', error);
+    res.status(500).json({ message: '대화 종료 중 오류가 발생했습니다.' });
+  }
+});
+
 /* ================================
    Socket.IO 실시간 통신
 ================================ */

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { connectSocket } from '../utils/socket';
 import { authFetch } from '../utils/api';
+import AlertModal from '../components/AlertModal';
 
 interface Message {
   id: number;
@@ -27,6 +28,17 @@ export default function ChatRoomPage() {
   const [newMessage, setNewMessage] = useState('');
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
+  const [isClosed, setIsClosed] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: '확인',
+    cancelText: '취소',
+    onConfirm: () => {},
+    onCancel: undefined as (() => void) | undefined
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,6 +51,40 @@ export default function ChatRoomPage() {
   }, []);
 
   const currentUser = getCurrentUser();
+
+  const closeAlert = useCallback(() => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const showAlert = useCallback((title: string, message: string, onConfirm?: () => void, confirmText = '확인') => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      cancelText: '취소',
+      onConfirm: () => {
+        closeAlert();
+        onConfirm?.();
+      },
+      onCancel: undefined
+    });
+  }, [closeAlert]);
+
+  const showConfirm = useCallback((title: string, message: string, onConfirm: () => void, confirmText = '확인', cancelText = '취소') => {
+    setAlertConfig({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      cancelText,
+      onConfirm: () => {
+        closeAlert();
+        onConfirm();
+      },
+      onCancel: closeAlert
+    });
+  }, [closeAlert]);
 
 
   useEffect(() => {
@@ -81,15 +127,24 @@ export default function ChatRoomPage() {
       }
     };
 
+    const onChatClosed = ({ roomId: closedRoomId }: { roomId: number }) => {
+      if (closedRoomId === roomNum && !isClosed) {
+        setIsClosed(true);
+        showAlert('대화 종료', '대화가 종료되었습니다.', () => navigate('/chat', { replace: true }));
+      }
+    };
+
     // 항상 초기화하고 다시 등록
     socket.off('connect');
     socket.off('disconnect');
     socket.off('new_message');
     socket.off('messages_read');
+    socket.off('chat_closed');
 
     socket.on('connect', onConnect);
     socket.on('new_message', onNewMessage);
     socket.on('messages_read', onMessagesRead);
+    socket.on('chat_closed', onChatClosed);
     
     socket.on('connect_error', (err) => {
       console.error('Socket Connect Error:', err.message);
@@ -113,9 +168,10 @@ export default function ChatRoomPage() {
       socket.off('connect', onConnect);
       socket.off('new_message', onNewMessage);
       socket.off('messages_read', onMessagesRead);
+      socket.off('chat_closed', onChatClosed);
       socket.emit('leave_room', roomNum);
     };
-  }, [roomId]);
+  }, [roomId, currentUser.id, navigate, isClosed, showAlert]);
 
   useEffect(() => {
     scrollToBottom();
@@ -186,13 +242,45 @@ export default function ChatRoomPage() {
         }
       } else {
         setNewMessage(content); // 실패 시 복구
-        alert('메시지 전송에 실패했습니다.');
+        showAlert('전송 실패', '메시지 전송에 실패했습니다.');
       }
     } catch (err) {
       setNewMessage(content);
       console.error('Send message error:', err);
-      alert('네트워크 오류로 메시지를 전송하지 못했습니다.');
+      showAlert('전송 실패', '네트워크 오류로 메시지를 전송하지 못했습니다.');
     }
+  };
+
+  const handleCloseChat = async () => {
+    if (!roomId || closing || isClosed) return;
+
+    showConfirm(
+      '대화 종료',
+      '이 상담 대화를 종료하시겠습니까? 종료 후에는 채팅방 목록에서 사라집니다.',
+      async () => {
+        setClosing(true);
+        try {
+          const res = await authFetch(`/api/chat-rooms/${roomId}/close`, {
+            method: 'PATCH'
+          });
+
+          if (res.ok) {
+            setIsClosed(true);
+            showAlert('대화 종료', '대화를 종료했습니다.', () => navigate('/chat', { replace: true }));
+            return;
+          }
+
+          const data = await res.json().catch(() => null);
+          showAlert('대화 종료 실패', data?.message || '대화 종료에 실패했습니다.');
+        } catch (err) {
+          console.error('Close chat error:', err);
+          showAlert('대화 종료 실패', '네트워크 오류로 대화를 종료하지 못했습니다.');
+        } finally {
+          setClosing(false);
+        }
+      },
+      '종료하기'
+    );
   };
 
   const formatTime = (dateStr: string) => {
@@ -249,6 +337,13 @@ export default function ChatRoomPage() {
             </>
           )}
         </div>
+        <button
+          onClick={handleCloseChat}
+          disabled={closing}
+          className="px-3 py-2 text-xs font-bold text-red-500 hover:opacity-80 disabled:opacity-40 transition-opacity"
+        >
+          {closing ? '종료 중...' : '대화 종료'}
+        </button>
       </header>
 
       {/* Messages */}
@@ -360,6 +455,16 @@ export default function ChatRoomPage() {
           </button>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText={alertConfig.confirmText}
+        cancelText={alertConfig.cancelText}
+        onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
+      />
     </div>
   );
 }

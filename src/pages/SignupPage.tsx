@@ -45,7 +45,7 @@ export default function SignupPage() {
     }
   };
   return (
-    <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col relative overflow-hidden">
+    <div className="bg-surface text-on-surface font-body min-h-[100dvh] flex flex-col relative overflow-auto">
       {/* Background Atmospheric Images - fixed z-index to stay behind everything */}
       <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none bg-surface">
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] opacity-[0.03] rotate-12">
@@ -77,7 +77,7 @@ export default function SignupPage() {
         </div>
       </nav>
 
-      <main className="flex-grow flex items-center justify-center px-6 pt-32 pb-12 relative z-10 w-full">
+      <main className="flex-grow flex items-start justify-center px-6 pt-24 pb-8 relative z-10 w-full">
         <div className="w-full max-w-[420px] space-y-10">
           <section className="text-center space-y-3">
             <div className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold tracking-widest uppercase mb-2">
@@ -162,7 +162,7 @@ export default function SignupPage() {
         </div>
       </main>
 
-      <footer className="py-6 text-center px-6 relative z-10 w-full mt-auto">
+      <footer className="py-4 text-center px-6 relative z-10 w-full mt-auto">
         <p className="text-xs text-gray-400 font-label tracking-widest uppercase">
           암호화됨 • 프라이버시 • 따뜻함
         </p>

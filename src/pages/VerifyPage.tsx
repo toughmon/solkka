@@ -138,7 +138,7 @@ export default function VerifyPage() {
     e.preventDefault();
   };
   return (
-    <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col relative overflow-hidden">
+    <div className="bg-surface font-body text-on-surface antialiased min-h-[100dvh] flex flex-col relative overflow-auto">
       {/* Background Decorative Image - safely pushed back */}
       <div className="fixed inset-0 -z-50 opacity-[0.03] pointer-events-none bg-surface">
         <img
@@ -163,7 +163,7 @@ export default function VerifyPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow flex flex-col items-center justify-center px-6 pt-32 pb-12 max-w-md mx-auto w-full relative z-10">
+      <main className="flex-grow flex flex-col items-center justify-start px-6 pt-24 pb-8 max-w-md mx-auto w-full relative z-10">
 
         {/* Supportive Backdrop Texture (Asymmetric) */}
         <div className="fixed -bottom-20 -left-20 w-64 h-64 bg-tertiary-container/30 rounded-full blur-[80px] -z-20 pointer-events-none"></div>

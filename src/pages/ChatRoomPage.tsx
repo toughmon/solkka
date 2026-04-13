@@ -223,7 +223,7 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col">
+    <div className="bg-surface font-body text-on-surface antialiased h-[100dvh] overflow-hidden flex flex-col">
       {/* Header */}
       <header className="fixed top-0 w-full z-50 bg-[#fbf9f8]/80 backdrop-blur-xl border-b border-gray-100 flex items-center justify-between px-4 h-16">
         <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function ChatRoomPage() {
       </header>
 
       {/* Messages */}
-      <main className="flex-1 pt-20 pb-24 px-4 max-w-2xl mx-auto w-full overflow-y-auto">
+      <main className="min-h-0 flex-1 pt-20 px-4 max-w-2xl mx-auto w-full overflow-y-auto">
         {/* Secure Banner */}
         <div className="flex justify-center mb-6 mt-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full border border-gray-200">
@@ -335,7 +335,10 @@ export default function ChatRoomPage() {
       </main>
 
       {/* Input Area */}
-      <div className="fixed bottom-0 left-0 w-full bg-[#fbf9f8]/90 backdrop-blur-xl border-t border-gray-100 px-4 pb-6 pt-3 z-50">
+      <div
+        className="shrink-0 w-full bg-[#fbf9f8]/90 backdrop-blur-xl border-t border-gray-100 px-4 pt-2"
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <div className="flex-1 bg-white border border-gray-200 shadow-sm rounded-2xl flex items-center px-4 py-2 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
             <input

@@ -40,10 +40,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="bg-surface font-body text-on-surface antialiased min-h-screen relative overflow-hidden flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#fbf9f8] via-[#f3dedd]/30 to-[#e7fff3]/30">
+    <div className="bg-surface font-body text-on-surface antialiased min-h-[100dvh] relative overflow-auto flex flex-col items-center px-6 pt-12 pb-6 bg-gradient-to-br from-[#fbf9f8] via-[#f3dedd]/30 to-[#e7fff3]/30">
 
       {/* App Identity Section */}
-      <div className="mb-10 text-center relative z-10 w-full max-w-sm">
+      <div className="mb-8 text-center relative z-10 w-full max-w-sm">
         <h1 className="font-headline font-extrabold text-4xl tracking-tight text-primary">
           Solkka
         </h1>
@@ -134,14 +134,14 @@ export default function LoginPage() {
       </div>
 
       {/* Footer Section */}
-      <footer className="mt-10 text-center relative z-10">
+      <footer className="mt-8 text-center relative z-10 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <p className="text-gray-600 text-sm font-medium">
           아직 계정이 없으신가요?
           <Link className="text-primary font-bold ml-1 hover:underline underline-offset-4 decoration-2" to="/signup">회원가입</Link>
         </p>
 
         {/* Atmospheric Element */}
-        <div className="mt-14 flex items-center justify-center gap-2 text-gray-400">
+        <div className="mt-8 flex items-center justify-center gap-2 text-gray-400">
           <span className="material-symbols-outlined text-sm">shield_moon</span>
           <span className="text-[10px] uppercase tracking-[0.2em] font-bold">암호화됨 & 익명성 보장</span>
         </div>

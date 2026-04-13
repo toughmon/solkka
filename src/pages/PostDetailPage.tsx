@@ -10,7 +10,6 @@ interface Post {
   content: string;
   view_count: number;
   like_count: number;
-  is_counseling_requested: boolean;
   created_at: string;
   category_name: string;
   author_nickname?: string;
@@ -318,9 +317,8 @@ export default function PostDetailPage() {
               );
             })()}
           </div>
-          {/* 상담요청 버튼: is_counseling_requested 게시물 + 타인의 댓글인 경우에만 */}
+          {/* 상담요청 버튼: 타인의 댓글인 경우에만 */}
           {(() => {
-            if (!post?.is_counseling_requested) return null;
             const userData = localStorage.getItem('user');
             const currentUser = userData ? JSON.parse(userData) : null;
             if (!currentUser || comment.user_account_id === currentUser.id) return null;

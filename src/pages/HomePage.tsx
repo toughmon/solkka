@@ -16,7 +16,6 @@ interface Post {
   content: string;
   view_count: number;
   like_count: number;
-  is_counseling_requested: boolean;
   created_at: string;
   category_name: string;
   is_liked: boolean;
@@ -206,12 +205,7 @@ export default function HomePage() {
                       <span className="px-3 py-1 rounded-full bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase">
                         {post.category_name}
                       </span>
-                      <div className="flex items-center gap-2">
-                        {post.is_counseling_requested && (
-                          <span className="material-symbols-outlined text-primary text-sm" title="상담 요청됨">psychology</span>
-                        )}
-                        <span className="text-xs text-outline font-medium">{getTimeAgo(post.created_at)}</span>
-                      </div>
+                      <span className="text-xs text-outline font-medium">{getTimeAgo(post.created_at)}</span>
                     </div>
                     <div className="space-y-2">
                       <h3 className="text-xl font-headline font-semibold text-on-surface leading-snug">{post.title}</h3>

@@ -16,7 +16,6 @@ export default function CreatePostPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [isCounselingRequested, setIsCounselingRequested] = useState(false);
   const [loading, setLoading] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false,
@@ -58,8 +57,7 @@ export default function CreatePostPage() {
         body: JSON.stringify({
           category_id: selectedCategoryId,
           title,
-          content,
-          is_counseling_requested: isCounselingRequested
+          content
         })
       });
 
@@ -142,28 +140,6 @@ export default function CreatePostPage() {
               className="w-full min-h-[350px] bg-transparent border-none p-0 focus:ring-0 text-lg font-body leading-relaxed text-on-surface-variant placeholder:text-outline-variant/40 resize-none outline-none"
               placeholder="여기에 당신의 마음을 자유롭게 남겨주세요. 모든 글은 익명으로 안전하게 보호됩니다."
             ></textarea>
-          </div>
-
-          {/* Counseling Option */}
-          <div className="bg-surface-container-low/50 p-5 rounded-2xl border border-outline-variant/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="font-headline font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-xl">psychology</span>
-                  1:1 상담 요청하기
-                </h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  누군가의 따뜻한 조언이나 위로가 필요한가요? <br />
-                  체크하면 상담사나 숙련된 유저가 말을 걸어올 수 있습니다.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsCounselingRequested(!isCounselingRequested)}
-                className={`w-12 h-6 flex-shrink-0 rounded-full transition-all relative block ${isCounselingRequested ? 'bg-primary' : 'bg-gray-300'}`}
-              >
-                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${isCounselingRequested ? 'translate-x-6' : 'translate-x-0'} left-1`}></div>
-              </button>
-            </div>
           </div>
         </div>
       </main>

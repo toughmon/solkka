@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS post (
   category_id INT REFERENCES category(id) NOT NULL,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
-  is_counseling_requested BOOLEAN DEFAULT FALSE,
   view_count INT DEFAULT 0,
   like_count INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

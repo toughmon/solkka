@@ -413,7 +413,7 @@ app.get('/api/categories', async (req, res) => {
 
 // 2. 게시글 작성
 app.post('/api/posts', authenticateToken, async (req, res) => {
-  const { category_id, title, content, is_counseling_requested } = req.body;
+  const { category_id, title, content } = req.body;
   const user_account_id = req.user.id;
 
   if (!category_id || !title || !content) {
@@ -423,10 +423,10 @@ app.post('/api/posts', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
       `INSERT INTO solkka.post 
-       (user_account_id, category_id, title, content, is_counseling_requested) 
-       VALUES ($1, $2, $3, $4, $5) 
+       (user_account_id, category_id, title, content) 
+       VALUES ($1, $2, $3, $4) 
        RETURNING id`,
-      [user_account_id || null, category_id, title, content, is_counseling_requested || false]
+      [user_account_id || null, category_id, title, content]
     );
 
     // 글 작성 성공 로그 & 게이미피케이션 (+2점, +0.1도)
@@ -452,7 +452,6 @@ app.get('/api/posts', async (req, res) => {
         p.content, 
         p.view_count, 
         p.like_count, 
-        p.is_counseling_requested,
         p.created_at,
         c.name as category_name,
         u.avatar_url as author_avatar_url,

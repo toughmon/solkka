@@ -192,8 +192,6 @@ export default function ChatRoomPage() {
       setNewMessage(content);
       console.error('Send message error:', err);
       alert('네트워크 오류로 메시지를 전송하지 못했습니다.');
-    } finally {
-      inputRef.current?.focus();
     }
   };
 
@@ -352,6 +350,8 @@ export default function ChatRoomPage() {
             />
           </div>
           <button
+            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => e.preventDefault()}
             onClick={handleSend}
             disabled={!newMessage.trim()}
             className="w-11 h-11 shrink-0 rounded-xl bg-primary hover:bg-[#3d4f5c] disabled:opacity-40 disabled:hover:bg-primary text-white flex items-center justify-center shadow-md active:scale-95 transition-all"

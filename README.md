@@ -1,73 +1,88 @@
-# React + TypeScript + Vite
+# Solkka
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Solkka is a Capacitor + React mobile app with a Node/Express backend.
 
-Currently, two official plugins are available:
+## Frontend
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Vite + React + TypeScript
+- Capacitor Android wrapper
+- Tailwind CSS
 
-## React Compiler
+## Backend
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Express
+- PostgreSQL
+- Socket.IO
 
-## Expanding the ESLint configuration
+## Android API configuration
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+The app uses a relative `/api/...` path in the frontend and rewrites it to `VITE_API_URL` at runtime in [`src/main.tsx`](./src/main.tsx).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+For Android real-device builds, the following settings are required so the app can call a LAN HTTP backend:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- [`capacitor.config.ts`](./capacitor.config.ts)
+  `server.cleartext: true`
+- [`capacitor.config.ts`](./capacitor.config.ts)
+  `server.androidScheme: 'http'`
+- [`android/app/src/main/AndroidManifest.xml`](./android/app/src/main/AndroidManifest.xml)
+  `android:usesCleartextTraffic="true"`
+- [`android/app/src/main/AndroidManifest.xml`](./android/app/src/main/AndroidManifest.xml)
+  `android:networkSecurityConfig="@xml/network_security_config"`
+- [`android/app/src/main/res/xml/network_security_config.xml`](./android/app/src/main/res/xml/network_security_config.xml)
+  cleartext traffic allowed
+- [`android/app/src/main/java/com/solkka/app/MainActivity.java`](./android/app/src/main/java/com/solkka/app/MainActivity.java)
+  `WebSettings.MIXED_CONTENT_ALWAYS_ALLOW`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Incident note: Android app could open backend health URL in browser but failed inside app
+
+Symptoms:
+
+- Mobile browser could open `http://<LAN-IP>:3001/api/health`
+- APK login and signup returned `TypeError: Failed to fetch`
+- Backend request logs did not show `/api/auth/login` or `/api/auth/send-code`
+
+Root cause:
+
+- The Android WebView was loading the app under a secure/local scheme and was blocking mixed-content requests to the LAN `http://` backend.
+- This was not a backend routing issue.
+- This was not solved by backend availability alone.
+
+Fix:
+
+1. Keep Android cleartext enabled.
+2. Force Capacitor Android to use `http` scheme.
+3. Explicitly allow mixed content in `MainActivity`.
+4. Keep CORS restricted to known development/mobile origins instead of globally allowing all origins.
+
+## CORS policy
+
+Default allowed origins in [`server/server.js`](./server/server.js):
+
+- `http://localhost`
+- `https://localhost`
+- `http://localhost:5173`
+- `http://127.0.0.1:5173`
+- `capacitor://localhost`
+
+If you need more origins, set `CORS_ORIGINS` in `server/.env` as a comma-separated list.
+
+## Build notes
+
+Frontend production build:
+
+```bash
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Sync Capacitor Android assets:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+npx cap sync android
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Build debug APK:
+
+```bash
+cd android
+./gradlew assembleDebug
 ```

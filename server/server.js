@@ -14,8 +14,34 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET || 'solkka-refresh-secret-2024
 
 const app = express();
 
+const DEFAULT_CORS_ORIGINS = [
+  'http://localhost',
+  'https://localhost',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'capacitor://localhost'
+];
+
+const parseCorsOrigins = () => {
+  const raw = process.env.CORS_ORIGINS;
+  if (!raw || !raw.trim()) return DEFAULT_CORS_ORIGINS;
+  return raw.split(',').map(origin => origin.trim()).filter(Boolean);
+};
+
+const allowedOrigins = parseCorsOrigins();
+const corsOptions = {
+  origin(origin, callback) {
+    // Mobile clients or same-origin non-browser clients can have no Origin header.
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`[CORS] blocked origin=${origin}`);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Global Request Logger
@@ -1154,7 +1180,10 @@ app.post('/api/chat-rooms/:id/messages', authenticateToken, async (req, res) => 
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: '*' }
+  cors: {
+    origin: corsOptions.origin,
+    credentials: true
+  }
 });
 
 // Socket.IO 인증 미들웨어

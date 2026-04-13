@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BottomNavBar from '../components/BottomNavBar';
 import { authFetch } from '../utils/api';
+import { connectSocket } from '../utils/socket';
 
 interface ChatRoom {
   id: number;
@@ -41,6 +42,31 @@ export default function ChatPage() {
       return;
     }
     fetchData();
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
+    const socket = connectSocket();
+
+    const refreshRooms = () => {
+      fetchData();
+    };
+
+    socket.off('chat_notification', refreshRooms);
+    socket.off('new_request', refreshRooms);
+    socket.off('request_accepted', refreshRooms);
+
+    socket.on('chat_notification', refreshRooms);
+    socket.on('new_request', refreshRooms);
+    socket.on('request_accepted', refreshRooms);
+
+    return () => {
+      socket.off('chat_notification', refreshRooms);
+      socket.off('new_request', refreshRooms);
+      socket.off('request_accepted', refreshRooms);
+    };
   }, []);
 
   const fetchData = async () => {

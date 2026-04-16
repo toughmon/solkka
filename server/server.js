@@ -6,6 +6,7 @@ const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -95,31 +96,63 @@ const transporter = nodemailer.createTransport({
 /* ================================
    게이미피케이션 (Gamification) 헬퍼
 ================================ */
+const gamificationRules = {
+  WRITE_POST: {
+    points: 2,
+    tempChange: 0.1,
+    label: '게시글 작성',
+    description: '이야기를 나누며 공감의 장을 열었어요.'
+  },
+  WRITE_COMMENT: {
+    points: 1,
+    tempChange: 0.1,
+    label: '댓글 작성',
+    description: '누군가의 이야기에 마음을 보탰어요.'
+  },
+  RECEIVE_LIKE: {
+    points: 5,
+    tempChange: 0.2,
+    label: '좋아요 받음',
+    description: '내 이야기가 다른 사람의 공감을 얻었어요.'
+  },
+  DAILY_CHECKIN: {
+    points: 10,
+    tempChange: 0.5,
+    label: '일일 체크인',
+    description: '오늘도 솔까에 들러 마음을 확인했어요.'
+  }
+};
+
+const getGamificationRule = (actionType) => gamificationRules[actionType] || null;
+
 const awardGamification = async (userId, actionType) => {
-  let points = 0;
-  let tempChange = 0.0;
-  
-  switch(actionType) {
-    case 'WRITE_POST': points = 2; tempChange = 0.1; break;
-    case 'WRITE_COMMENT': points = 1; tempChange = 0.1; break;
-    case 'RECEIVE_LIKE': points = 5; tempChange = 0.2; break;
-    case 'DAILY_CHECKIN': points = 10; tempChange = 0.5; break;
-    default: return;
+  const rule = getGamificationRule(actionType);
+  if (!rule) {
+    return { ok: false, code: 'UNKNOWN_ACTION' };
   }
 
+  const client = await pool.connect();
   try {
-    // 트랜잭션 없이 로깅 및 업데이트 진행
-    await pool.query(
+    await client.query('BEGIN');
+
+    await client.query(
       'INSERT INTO solkka.gamification_log (user_account_id, action_type, points_earned, temperature_change) VALUES ($1, $2, $3, $4)',
-      [userId, actionType, points, tempChange]
+      [userId, actionType, rule.points, rule.tempChange]
     );
 
-    await pool.query(
+    await client.query(
       'UPDATE solkka.user_account SET points = points + $1, temperature = temperature + $2 WHERE id = $3',
-      [points, tempChange, userId]
+      [rule.points, rule.tempChange, userId]
     );
+
+    await client.query('COMMIT');
+    return { ok: true, rule };
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Gamification Error:', err);
+    return { ok: false, code: err.code || 'UNKNOWN_ERROR' };
+  } finally {
+    client.release();
   }
 };
 
@@ -128,6 +161,19 @@ const getLevelName = (points) => {
   if (points < 200) return '다정한 이웃';
   if (points < 500) return '따뜻한 위로가';
   return '마음의 안식처';
+};
+
+const buildAppBaseUrl = (req) => {
+  if (process.env.APP_BASE_URL) {
+    return process.env.APP_BASE_URL.replace(/\/+$/, '');
+  }
+
+  const origin = req.get('origin');
+  if (origin) {
+    return origin.replace(/\/+$/, '');
+  }
+
+  return `${req.protocol}://${req.get('host')}`;
 };
 
 /* ================================
@@ -180,6 +226,137 @@ app.post('/api/auth/send-code', async (req, res) => {
   } catch (error) {
     console.error('Mail Send Error:', error);
     res.status(500).json({ success: false, message: '메일 발송에 실패했습니다. (환경변수 세팅 확인)' });
+  }
+});
+
+app.post('/api/auth/request-password-reset', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: '이메일을 입력해주세요.' });
+  }
+
+  try {
+    const userResult = await pool.query(
+      'SELECT id, email FROM solkka.user_account WHERE email = $1',
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.json({
+        success: true,
+        message: '가입된 이메일이라면 비밀번호 재설정 링크를 보내드렸습니다.'
+      });
+    }
+
+    const user = userResult.rows[0];
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    const resetUrl = `${buildAppBaseUrl(req)}/reset-password?token=${rawToken}`;
+
+    await pool.query(
+      'DELETE FROM solkka.password_reset_token WHERE user_account_id = $1',
+      [user.id]
+    );
+
+    await pool.query(
+      `INSERT INTO solkka.password_reset_token (user_account_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [user.id, tokenHash, expiresAt]
+    );
+
+    await transporter.sendMail({
+      from: `"Solkka" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: '[Solkka] 비밀번호 재설정 링크',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #4c6272;">비밀번호 재설정</h2>
+          <p>아래 버튼을 눌러 새 비밀번호를 설정해 주세요.</p>
+          <div style="margin: 24px 0;">
+            <a
+              href="${resetUrl}"
+              style="display: inline-block; padding: 12px 20px; background: #4c6272; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;"
+            >
+              비밀번호 재설정하기
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #6b7280;">링크는 1시간 동안 유효합니다.</p>
+          <p style="font-size: 13px; color: #6b7280;">본인이 요청하지 않았다면 이 메일을 무시해 주세요.</p>
+        </div>
+      `
+    });
+
+    res.json({
+      success: true,
+      message: '가입된 이메일이라면 비밀번호 재설정 링크를 보내드렸습니다.'
+    });
+  } catch (error) {
+    console.error('Request Password Reset Error:', error);
+    res.status(500).json({ success: false, message: '비밀번호 재설정 링크 전송에 실패했습니다.' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ success: false, message: '재설정 토큰과 새 비밀번호가 필요합니다.' });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' });
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const tokenResult = await client.query(
+      `SELECT id, user_account_id
+       FROM solkka.password_reset_token
+       WHERE token_hash = $1
+         AND used_at IS NULL
+         AND expires_at > NOW()
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [tokenHash]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: '유효하지 않거나 만료된 재설정 링크입니다.' });
+    }
+
+    const resetToken = tokenResult.rows[0];
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await client.query(
+      'UPDATE solkka.user_account SET password_hash = $1 WHERE id = $2',
+      [passwordHash, resetToken.user_account_id]
+    );
+
+    await client.query(
+      'UPDATE solkka.password_reset_token SET used_at = NOW() WHERE id = $1',
+      [resetToken.id]
+    );
+
+    await client.query(
+      'DELETE FROM solkka.refresh_token WHERE user_account_id = $1',
+      [resetToken.user_account_id]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, message: '비밀번호가 성공적으로 변경되었습니다.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ success: false, message: '비밀번호 재설정 중 오류가 발생했습니다.' });
+  } finally {
+    client.release();
   }
 });
 
@@ -592,6 +769,53 @@ app.patch('/api/users/:id/avatar', authenticateToken, async (req, res) => {
 });
 
 // 7-5. 내 활동 통계 (작성한 글, 남긴 댓글, 진행중인 채팅 수)
+app.post('/api/users/me/daily-checkin', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const reward = await awardGamification(userId, 'DAILY_CHECKIN');
+    if (!reward.ok && reward.code === '23505') {
+      return res.json({
+        success: true,
+        awarded: false,
+        message: '오늘의 체크인은 이미 완료되었습니다.'
+      });
+    }
+
+    if (!reward.ok) {
+      return res.status(500).json({ success: false, message: '체크인 보상 지급에 실패했습니다.' });
+    }
+
+    const userResult = await pool.query(
+      'SELECT points, temperature FROM solkka.user_account WHERE id = $1',
+      [userId]
+    );
+    const points = userResult.rows[0]?.points || 0;
+    const temperature = parseFloat(userResult.rows[0]?.temperature) || 36.5;
+
+    res.json({
+      success: true,
+      awarded: true,
+      message: '오늘의 체크인이 완료되었습니다.',
+      reward: {
+        actionType: 'DAILY_CHECKIN',
+        label: reward.rule.label,
+        description: reward.rule.description,
+        pointsEarned: reward.rule.points,
+        temperatureChange: reward.rule.tempChange
+      },
+      totals: {
+        points,
+        temperature,
+        levelName: getLevelName(points)
+      }
+    });
+  } catch (error) {
+    console.error('Daily Check-in Error:', error);
+    res.status(500).json({ success: false, message: '일일 체크인 처리 중 오류가 발생했습니다.' });
+  }
+});
+
 app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -632,6 +856,38 @@ app.get('/api/users/me/stats', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Fetch Stats Error:', error);
     res.status(500).json({ message: '통계 정보를 가져오지 못했습니다.' });
+  }
+});
+
+app.get('/api/users/me/gamification-history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 30);
+
+    const result = await pool.query(
+      `SELECT action_type, points_earned, temperature_change, created_at
+       FROM solkka.gamification_log
+       WHERE user_account_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [userId, limit]
+    );
+
+    res.json(result.rows.map((row) => {
+      const rule = getGamificationRule(row.action_type);
+
+      return {
+        actionType: row.action_type,
+        actionLabel: rule?.label || row.action_type,
+        actionDescription: rule?.description || '활동 보상이 적립되었습니다.',
+        pointsEarned: row.points_earned,
+        temperatureChange: parseFloat(row.temperature_change) || 0,
+        created_at: row.created_at
+      };
+    }));
+  } catch (error) {
+    console.error('Fetch Gamification History Error:', error);
+    res.status(500).json({ message: '보상 내역을 가져오지 못했습니다.' });
   }
 });
 

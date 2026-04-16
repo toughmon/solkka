@@ -32,7 +32,7 @@ export default function LoginPage() {
       } else {
         setErrorMSG(data.message || '로그인에 실패했습니다.');
       }
-    } catch (err) {
+    } catch {
       setErrorMSG('서버와 연결을 실패했습니다.');
     } finally {
       setLoading(false);
@@ -83,7 +83,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <div className="flex justify-between items-center px-1">
               <label className="block text-sm font-label font-bold text-gray-700" htmlFor="password">비밀번호</label>
-              <a className="text-xs font-bold text-primary hover:opacity-80 transition-opacity" href="#">비밀번호 찾기</a>
+              <Link className="text-xs font-bold text-primary hover:opacity-80 transition-opacity" to="/reset-password">비밀번호 찾기</Link>
             </div>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">lock</span>
@@ -110,27 +110,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Social/Alternative Entry */}
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <div className="relative flex items-center justify-center mb-6">
-            <span className="absolute px-4 bg-white text-[10px] uppercase tracking-widest font-bold text-gray-400">또는 다음으로 로그인</span>
-            <div className="w-full h-[1px] bg-gray-100"></div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <img
-                alt="Google"
-                className="w-4 h-4 grayscale opacity-70"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuD63O8M-naAdy3UOvD8020IpA10z451D98XNSUBR51TK3yoRs5NoM8LdQHqva3XhReaJs6KlN-NROSgH7DBjo2FQKuFcjHsBzBMMdhR4zVT2DL5zkE4b04jGJ4ZITBpjtJJyySXFtsIv-VO3vEWjZxW5bI9CNsO6m1S370x1SE81KoevpMXcVmyxqhYmAkWY6KSu34UlmCTqwgS2PhUAUDHKkYIFVInyOZj0GsIFfvNbdppDYaAKPLGKf6Lotkf6mqgAvD5242zWis"
-              />
-              <span className="text-xs font-bold text-gray-600">Google</span>
-            </button>
-            <button className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
-              <span className="material-symbols-outlined text-lg text-gray-500">fingerprint</span>
-              <span className="text-xs font-bold text-gray-600">패스키</span>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Footer Section */}

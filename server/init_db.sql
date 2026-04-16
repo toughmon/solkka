@@ -19,8 +19,19 @@ CREATE TABLE IF NOT EXISTS email_verification (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS password_reset_token (
+  id SERIAL PRIMARY KEY,
+  user_account_id INT REFERENCES user_account(id) ON DELETE CASCADE,
+  token_hash VARCHAR(64) UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_user_account_email ON user_account(email);
 CREATE INDEX IF NOT EXISTS idx_email_verification_email ON email_verification(email);
+CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_token(user_account_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_token(expires_at);
 
 -- 3. 카테고리 테이블
 CREATE TABLE IF NOT EXISTS category (
@@ -118,3 +129,6 @@ CREATE TABLE IF NOT EXISTS solkka.gamification_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_gamification_user ON solkka.gamification_log(user_account_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gamification_daily_checkin_unique
+ON solkka.gamification_log(user_account_id, action_type, ((created_at)::date))
+WHERE action_type = 'DAILY_CHECKIN';

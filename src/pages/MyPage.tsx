@@ -1,8 +1,46 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useEffectEvent } from 'react';
 import { useNavigate } from 'react-router';
 import BottomNavBar from '../components/BottomNavBar';
 import AlertModal from '../components/AlertModal';
 import { authFetch } from '../utils/api';
+
+interface RewardHistoryItem {
+  actionType: string;
+  actionLabel: string;
+  actionDescription: string;
+  pointsEarned: number;
+  temperatureChange: number;
+  created_at: string;
+}
+
+interface UserSummary {
+  id: number;
+  email: string;
+  nickname: string;
+  avatar_url?: string | null;
+}
+
+interface PostActivityItem {
+  type: 'post';
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  categoryName: string;
+  likeCount: number;
+  commentCount: number;
+}
+
+interface ChatActivityItem {
+  type: 'chat';
+  id: number;
+  partnerNickname: string;
+  partnerAvatarUrl?: string | null;
+  lastMessage?: string | null;
+  created_at: string;
+}
+
+type ActivityItem = PostActivityItem | ChatActivityItem;
 
 const getTimeAgo = (dateStr: string) => {
   if (!dateStr) return '';
@@ -24,57 +62,42 @@ const safeAvatarSrc = (src?: string | null, seed?: string) => {
   return src;
 };
 
+const getRewardIcon = (actionType: string) => {
+  switch (actionType) {
+    case 'WRITE_POST':
+      return 'edit_square';
+    case 'WRITE_COMMENT':
+      return 'chat';
+    case 'RECEIVE_LIKE':
+      return 'favorite';
+    case 'DAILY_CHECKIN':
+      return 'calendar_month';
+    default:
+      return 'stars';
+  }
+};
+
 export default function MyPage() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserSummary | null>(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      return userData ? JSON.parse(userData) : null;
+    } catch {
+      return null;
+    }
+  });
   const [stats, setStats] = useState({ postCount: 0, commentCount: 0, chatCount: 0, points: 0, temperature: 36.5, levelName: '초보 리스너' });
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
+  const [rewardHistory, setRewardHistory] = useState<RewardHistoryItem[]>([]);
+  const [checkedInUserId, setCheckedInUserId] = useState<number | null>(null);
 
   useEffect(() => {
     const accessToken = localStorage.getItem('accessToken');
-    const userData = localStorage.getItem('user');
-    if (!accessToken || !userData) {
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    try {
-      setUser(JSON.parse(userData));
-    } catch {
+    if (!accessToken || !user) {
       navigate('/login', { replace: true });
     }
-  }, [navigate]);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await authFetch('/api/users/me/stats');
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      }
-    };
-
-    const fetchActivities = async () => {
-      try {
-        const res = await authFetch('/api/users/me/activities?limit=3');
-        if (res.ok) {
-          const data = await res.json();
-          setRecentActivities(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch activities:', error);
-      }
-    };
-
-    if (user) {
-      fetchStats();
-      fetchActivities();
-    }
-  }, [user]);
+  }, [navigate, user]);
 
   const [alertConfig, setAlertConfig] = useState({
     isOpen: false,
@@ -91,6 +114,69 @@ export default function MyPage() {
       onConfirm: onConfirm || (() => setAlertConfig(prev => ({ ...prev, isOpen: false })))
     });
   };
+
+  const fetchDashboardData = useEffectEvent(async () => {
+    try {
+      const [statsRes, activitiesRes, historyRes] = await Promise.all([
+        authFetch('/api/users/me/stats'),
+        authFetch('/api/users/me/activities?limit=3'),
+        authFetch('/api/users/me/gamification-history?limit=5')
+      ]);
+
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
+      }
+
+      if (activitiesRes.ok) {
+        setRecentActivities(await activitiesRes.json());
+      }
+
+      if (historyRes.ok) {
+        setRewardHistory(await historyRes.json());
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    }
+  });
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const runDailyCheckin = async () => {
+      if (!user?.id || checkedInUserId === user.id) {
+        return;
+      }
+
+      try {
+        const res = await authFetch('/api/users/me/daily-checkin', {
+          method: 'POST'
+        });
+
+        if (!res.ok) {
+          return;
+        }
+
+        const data = await res.json();
+        setCheckedInUserId(user.id);
+
+        if (data.awarded) {
+          await fetchDashboardData();
+          showAlert(
+            '오늘의 체크인 완료',
+            `${data.reward.pointsEarned}P와 체온 ${data.reward.temperatureChange}°C가 적립되었습니다.`
+          );
+        }
+      } catch (error) {
+        console.error('Failed to run daily check-in:', error);
+      }
+    };
+
+    runDailyCheckin();
+  }, [checkedInUserId, user]);
 
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem('refreshToken');
@@ -298,6 +384,42 @@ export default function MyPage() {
                 </div>
               </div>
             )
+          ))}
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between mt-8">
+            <h3 className="font-headline font-bold text-lg text-on-surface">최근 보상 내역</h3>
+            <span className="text-xs font-semibold text-on-surface-variant">포인트가 쌓인 이유</span>
+          </div>
+
+          {rewardHistory.length === 0 ? (
+            <div className="text-center text-on-surface-variant py-8 text-sm bg-surface-container-lowest rounded-[1.5rem] border border-surface-container/60">
+              아직 적립된 보상이 없습니다.
+            </div>
+          ) : rewardHistory.map((item, idx) => (
+            <div key={`${item.actionType}-${item.created_at}-${idx}`} className="bg-surface-container-lowest rounded-[1.5rem] p-5 border border-surface-container/60 shadow-sm">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">{getRewardIcon(item.actionType)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-headline font-semibold text-on-surface">{item.actionLabel}</p>
+                      <p className="text-sm text-on-surface-variant mt-1">{item.actionDescription}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-bold text-primary">+{item.pointsEarned}P</p>
+                      <p className="text-xs font-medium text-on-surface-variant">+{item.temperatureChange}°C</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-medium text-on-surface-variant mt-3">
+                    {getTimeAgo(item.created_at)}
+                  </p>
+                </div>
+              </div>
+            </div>
           ))}
         </section>
 
